@@ -6,7 +6,7 @@
 
 ## Version
 
-- **.NET Version**: 8.0 (ASP.NET Core)
+- **.NET Version**: 10 (ASP.NET Core)
 - **C# Language Version**: 12
 - **Database**: PostgreSQL
 - **Logging**: Serilog
@@ -65,7 +65,7 @@
 | Component               | Details                                    |
 |-------------------------|--------------------------------------------|
 | **Language**            | C# 12                                      |
-| **Framework**           | ASP.NET Core 8.0                           |
+| **Framework**           | ASP.NET Core 10                          |
 | **Database**            | PostgreSQL 16                              |
 | **ORM**                 | Entity Framework Core 8                    |
 | **Authentication**      | JWT (Microsoft.AspNetCore.Authentication) |

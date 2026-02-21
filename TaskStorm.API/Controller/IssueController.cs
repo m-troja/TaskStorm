@@ -1,0 +1,158 @@
+﻿using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Mvc;
+using TaskStorm.Exception.IssueException;
+using TaskStorm.Log;
+using TaskStorm.Model.DTO;
+using TaskStorm.Model.DTO.Cnv;
+using TaskStorm.Model.IssueFolder;
+using TaskStorm.Model.Request;
+using TaskStorm.Model.Response;
+using TaskStorm.Service;
+using TaskStorm.Service.Impl;
+
+namespace TaskStorm.Controller;
+
+[Authorize]
+[ApiController]
+[Route("api/v1/issue")]
+public class IssueController : ControllerBase
+{
+    private readonly IIssueService _is;
+    private readonly ILogger<IssueController> l;
+    private readonly IssueCnv _issueCnv;
+
+    [Authorize]
+    [HttpPost]
+    [Route("create")]
+    public async Task<ActionResult<IssueDto>> CreateIssue(CreateIssueRequest req)
+    {
+        l.LogDebug($"Received create issue request: {req}");
+        Issue issue;
+        try 
+        {
+            issue = await _is.CreateIssueAsync(req);
+        }
+        catch (IssueCreationException)
+        {
+
+            throw;
+        }
+
+        var issueDto = _issueCnv.ConvertIssueToIssueDto(issue);
+        return Ok(issueDto);
+    }
+
+    [HttpGet("key/{key}")]
+    public async Task<ActionResult<IssueDto>> GetIssueByKey(string key)
+    {
+        l.LogDebug($"Received get issue by key request: {key}");
+        var IssueDto = await _is.GetIssueDtoByKeyAsync(key);
+
+        return Ok(IssueDto);
+
+    }
+
+    [HttpGet("all")]
+    public async Task<ActionResult<List<IssueDto>>> GetAllIssues()
+    {
+        l.LogDebug($"Received get all issues request");
+        var issues = await _is.GetAllIssues();
+        return Ok(issues);
+
+    }
+    [HttpGet("id/{id}")]
+    public async Task<ActionResult<IssueDto>> GetIssueById(int id)
+    {
+        l.LogDebug($"Received get issue by id request: {id}");
+        var IssueDto = await _is.GetIssueDtoByIdAsync(id);
+       
+        return Ok(IssueDto);
+    }
+
+    [HttpPut("assign")]
+    public async Task<ActionResult<IssueDto>> AssignIssue([FromBody] AssignIssueRequest req)
+    {
+        l.LogDebug($"Received assign issue request: {req}");
+        var issue = await _is.AssignIssueAsync(req);
+        return Ok(_issueCnv.ConvertIssueToIssueDto(issue));
+    }
+
+    [HttpPut("rename")]
+    public async Task<ActionResult<IssueDto>> RenameIssue([FromBody] RenameIssueRequest req)
+    {
+        l.LogDebug($"Received rename issue request: {req.id}, {req.newTitle}");
+        IssueDto issueDto = await _is.RenameIssueAsync(req);
+        return Ok(issueDto);
+    }
+
+    [HttpPut("assign-team")]
+    public async Task<ActionResult<IssueDto>> AssignTeam([FromBody] AssignTeamRequest req)
+    {
+        l.LogDebug($"Received AssignTeam request: {req.IssueId}, {req.TeamId}");
+        IssueDto issueDto = await _is.AssignTeamAsync(req);
+        return Ok(issueDto);
+    }
+
+    [HttpPut("update-status")]
+    public async Task<ActionResult<IssueDto>> ChangeIssueStatus([FromBody] ChangeIssueStatusRequest req)
+    {
+        l.LogDebug($"Received update issue status request: {req.IssueId}, {req.NewStatus}");
+        IssueDto issueDto = await _is.ChangeIssueStatusAsync(req);
+        return Ok(issueDto);
+    }
+
+    [HttpPut("update-priority")]
+    public async Task<ActionResult<IssueDto>> UpdateIssuePriority([FromBody] ChangeIssuePriorityRequest req)
+    {
+        l.LogDebug($"Received update issue priority request: {req.IssueId}, {req.NewPriority}");
+        IssueDto issueDto = await _is.ChangeIssuePriorityAsync(req);
+        return Ok(issueDto);
+    }
+
+    [HttpPut("update-due-date")]
+    public async Task<ActionResult<IssueDto>> UpdateDueDate([FromBody] UpdateDueDateRequest req)
+    {
+        l.LogDebug($"Received update due date request: {req.IssueId}, {req.DueDate}");
+        IssueDto issueDto = await _is.UpdateDueDateAsync(req);
+        return Ok(issueDto);
+    }
+
+    [HttpGet("user/{userId:int}")]
+    public async Task<ActionResult<List<IssueDto>>> GetAllIssuesByUserId(int userId)
+    {
+        l.LogDebug($"Received get all issues by user id request: {userId}");
+        var issuesDto = await _is.GetAllIssuesByUserId(userId);
+        return Ok(issuesDto);
+    }
+
+    [HttpGet("project/{projectId:int}")]
+    public async Task<ActionResult<List<IssueDto>>> GetAllIssuesByProjectId(int projectId)
+    {
+        l.LogDebug($"Received get all issues by project id request: {projectId}");
+        var issuesDto = await _is.GetAllIssuesByProjectId(projectId);
+        return Ok(issuesDto);
+    }
+
+    [HttpDelete("{id:int}")]
+    public async Task<ActionResult<string>> DeletelIssueById(int id)
+    {
+        l.LogInformation($"Triggered endpoint DeletelIssueById {id}");
+        await _is.deleteIssueById(id);
+        return Ok($"Deleted issue {id}");
+    }
+
+    [HttpDelete("all")]
+    public async Task<ActionResult<string>> DeleteAllIssues()
+    {
+        l.LogInformation("Triggered endpoint Delete all issues");
+        await _is.deleteAllIssues();
+        return Ok("All issues deleted successfully");
+    }
+
+    public IssueController(IIssueService @is, ILogger<IssueController> l, IssueCnv _issueCnv)
+    {
+        _is = @is;
+        this.l = l;
+        this._issueCnv = _issueCnv;
+    }
+}
