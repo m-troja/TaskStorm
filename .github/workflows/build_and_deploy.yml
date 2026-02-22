@@ -41,7 +41,7 @@ jobs:
             unlink '${{ secrets.WORK_DIR }}/latest';
           fi
           ln -s '$VERSION' '${{ secrets.WORK_DIR }}/latest' "
-          rsync -avz Task_System.API/bin/Release/net10.0/ ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }}:${{ secrets.WORK_DIR }}/$VERSION/
+          rsync -avz TaskStorm.API/bin/Release/net10.0/ ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }}:${{ secrets.WORK_DIR }}/$VERSION/
 
       - name: Restart app on server
         run: |
