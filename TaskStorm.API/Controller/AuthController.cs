@@ -25,44 +25,11 @@ public class AuthController : ControllerBase
     [HttpPost("regenerate-tokens")]
     public async Task<ActionResult<TokenResponseDto>> RegenerateTokensByRefreshToken([FromBody] RefreshTokenRequest req)
     {
-        l.LogDebug($"Controller POST regenerate-tokens: {req.RefreshToken}");
+        l.LogInformation($"POST api/v1/auth/regenerate-tokens: {req.RefreshToken}");
+        var tokenDto = await _authService.RegenerateTokensByRefreshToken(req.RefreshToken);
+        l.LogDebug($"Tokens regenerated successfully by refreshToken={req.RefreshToken}, new token= {tokenDto.RefreshToken}");  
 
-        Boolean validated = false;
-        try
-        {
-            validated = await _authService.ValidateRefreshTokenRequest(req.RefreshToken);
-        }
-        catch (InvalidRefreshTokenException ex)
-        {
-            l.LogError($"Validation failed: {ex}");
-            return Unauthorized(new Response(ResponseType.ERROR, "Validation failed"));
-        }
-        catch (UserNotFoundException ex)
-        {
-            l.LogError($"User not found");
-            return NotFound(new Response(ResponseType.ERROR, "User not found"));
-        }
-        catch (TokenRevokedException ex)
-        {
-            l.LogError($"Refresh token is revoked");
-            return Unauthorized(new Response(ResponseType.ERROR, "Refresh token is revoked"));
-        }
-        catch (TokenExpiredException ex)
-        {
-            l.LogError($"Refresh token expired");
-            return Unauthorized(new Response(ResponseType.ERROR, "Refresh token expired"));
-        }
-        if (validated)
-        {
-            var tokenDto = await _authService.RegenerateTokensByRefreshToken(req.RefreshToken);
-            l.LogDebug($"Tokens regenerated successfully by refreshToken={req.RefreshToken}");  
-
-            return Ok(tokenDto);
-        }
-        else
-        {
-            return Unauthorized(new Response(ResponseType.ERROR, "Validation failed"));
-        }
+        return Ok(tokenDto);
     }
 
     public AuthController(ILogger<AuthController> l, IAuthService authService)

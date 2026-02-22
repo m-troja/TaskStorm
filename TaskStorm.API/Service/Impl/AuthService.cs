@@ -46,10 +46,10 @@ public class AuthService : IAuthService
         return NewRefreshToken;
     }
 
-    public async Task<Boolean> ValidateRefreshTokenRequest(string refreshToken)
+    private async Task ValidateRefreshTokenRequest(string refreshToken)
     {
-        var userByRefreshToken = await _db.Users.FirstOrDefaultAsync( u => u.RefreshTokens.Any(rt => rt.Token == refreshToken));
         var refreshTokenFromDb = _db.RefreshTokens.FirstOrDefault(rt => rt.Token == refreshToken);
+        var userByRefreshToken = await _db.Users.FirstOrDefaultAsync( u => u.RefreshTokens.Any(rt => rt.Token == refreshToken));
         if (userByRefreshToken == null || refreshTokenFromDb == null || refreshTokenFromDb.UserId != userByRefreshToken.Id )
             {
             l.LogDebug("Refresh token or user not found");
@@ -66,11 +66,17 @@ public class AuthService : IAuthService
             throw new TokenExpiredException("Refresh token expired");
         }
         l.LogDebug("Token validated succesffully");
-        return true;
     }
-    public async Task<TokenResponseDto> RegenerateTokensByRefreshToken(string refreshToken)
+    public async Task<TokenResponseDto> RegenerateTokensByRefreshToken(string oldRefreshToken)
     {
-        var userByRefreshToken = await _db.Users.Include(u => u.RefreshTokens).FirstOrDefaultAsync(u => u.RefreshTokens.Any(rt => rt.Token == refreshToken)) ?? throw new UserNotFoundException("User was not found");
+        await ValidateRefreshTokenRequest(oldRefreshToken);
+
+        var oldToken = await _db.RefreshTokens.FirstOrDefaultAsync(rt => rt.Token == oldRefreshToken) ?? throw new InvalidRefreshTokenException("Refresh token not found");
+        if (oldToken != null && !oldToken.IsRevoked)
+        {
+            oldToken.IsRevoked = true;
+        }
+        var userByRefreshToken = await _db.Users.Include(u => u.RefreshTokens).FirstOrDefaultAsync(u => u.RefreshTokens.Any(rt => rt.Token == oldRefreshToken)) ?? throw new UserNotFoundException("User was not found");
         var NewRefreshToken = _jwtGenerator.GenerateRefreshToken(userByRefreshToken.Id);
 
         await _db.RefreshTokens.AddAsync(NewRefreshToken);
