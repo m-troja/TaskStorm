@@ -31,8 +31,14 @@ public class FileController : ControllerBase
     public async Task<ActionResult<AttachmentCreatedResponse>> Upload(
         [FromForm] FileUploadRequest request)
     {
+        l.LogDebug("POST api/v1/file: commentId={commentId}, fileName={fileName}, Name={name}, fileSize={fileSize}",
+            request.CommentId, request.File?.FileName, request.File?.Name, request.File?.Length);
+
         if (request.File == null || request.File.Length == 0)
+        {
+            l.LogError("Invalid file upload attempt: No file provided or file is empty, file {}", request.File?.FileName);
             return BadRequest("Invalid file");
+        }
 
         var id = await _fileService.SaveImageAsync(request.File, request.CommentId);
 

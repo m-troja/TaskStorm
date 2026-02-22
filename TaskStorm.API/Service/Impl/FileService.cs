@@ -32,6 +32,8 @@ public class FileService : IFileService
         var GuidWithExtension = $"{Guid.NewGuid()}{Path.GetExtension(file.FileName)}";
         var absolutePath = Path.Combine(FullFilePath, GuidWithExtension);
         var relativePath = Path.Combine(UploadFolder, GuidWithExtension).Replace("\\", "/");
+        _logger.LogDebug("Saving file {fileName} for comment {commentId} at path {absolutePath}", file.FileName, commentId, absolutePath);
+        _logger.LogDebug("Generated GUID with extension: {GuidWithExtension} for file {fileName}", GuidWithExtension, file.FileName);
 
         await CreateFile(absolutePath, file);
 
