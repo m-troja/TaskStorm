@@ -1,6 +1,7 @@
 ﻿using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Logging;
+using System.Reflection;
 using System.Security.Claims;
 using TaskStorm.Log;
 using TaskStorm.Model.DTO;
@@ -36,14 +37,14 @@ public class TestController : ControllerBase
     }
 
     [HttpGet("version")]
-    public ActionResult<String> version()
+    public IActionResult GetVersion()
     {
-        l.LogDebug("Test controller version entered");
+        var version = System.Reflection.Assembly
+            .GetExecutingAssembly()
+            .GetCustomAttribute<System.Reflection.AssemblyInformationalVersionAttribute>()?
+            .InformationalVersion ?? "unknown";
 
-        //Env vars check
-        string version = "Task System API version 2.3.6";
-        return Ok(version);
-
+        return Ok(new { version });
     }
 
     [HttpGet("profile")]

@@ -72,6 +72,10 @@ public class AuthService : IAuthService
     {
         var userByRefreshToken = await _db.Users.Include(u => u.RefreshTokens).FirstOrDefaultAsync(u => u.RefreshTokens.Any(rt => rt.Token == refreshToken)) ?? throw new UserNotFoundException("User was not found");
         var NewRefreshToken = _jwtGenerator.GenerateRefreshToken(userByRefreshToken.Id);
+
+        await _db.RefreshTokens.AddAsync(NewRefreshToken);
+        await _db.SaveChangesAsync();
+
         var refreshTokenDto = refreshTokenCnv.EntityToDto(NewRefreshToken);
         return new TokenResponseDto( 
             _jwtGenerator.GenerateAccessToken(userByRefreshToken.Id),

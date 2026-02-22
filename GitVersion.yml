@@ -1,0 +1,7 @@
+mode: ContinuousDeployment
+branches:
+  main:
+    increment: Patch
+tag-prefix: "v"
+ignore:
+  sha: []
