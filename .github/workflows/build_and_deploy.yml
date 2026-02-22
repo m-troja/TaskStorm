@@ -26,8 +26,11 @@ jobs:
         run: dotnet build TaskStorm.API/TaskStorm.API.csproj --configuration Release /p:Version=${{ steps.gitversion.outputs.fullSemVer }}
       - name: Show build output
         run: ls -R TaskStorm.API/bin/Release/
+      - name: Install SSH keys
         run: |
+          install -m 600 -D /dev/null ~/.ssh/id_rsa
           echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/id_rsa
+          ssh-keyscan -H ${{ secrets.SSH_HOST }} > ~/.ssh/known_hosts
 
       - name: Upload build via rsync
         run: |
@@ -38,11 +41,12 @@ jobs:
             unlink '${{ secrets.WORK_DIR }}/latest';
           fi
           ln -s '$VERSION' '${{ secrets.WORK_DIR }}/latest' "
-          rsync -avz TaskStorm.API/bin/Release/net10.0/ ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }}:${{ secrets.WORK_DIR }}/$VERSION/
+          rsync -avz Task_System.API/bin/Release/net10.0/ ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }}:${{ secrets.WORK_DIR }}/$VERSION/
 
       - name: Restart app on server
         run: |
           ssh ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} \
+            "sudo systemctl restart task-system-api.service"
 
       - name: Cleanup
         run: rm -rf ~/.ssh

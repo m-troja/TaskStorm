@@ -12,7 +12,7 @@ public class SlackNotificationService : ISlackNotificationService
 {
     private readonly IssueCnv _issueCnv;
     private readonly ILogger<SlackNotificationService> logger;
-    private readonly string _EventEndpoint = "/api/v1/TaskStorm/event";
+    private readonly string _EventEndpoint = "api/v1/taskstorm/event";
     private readonly String _ChatServerAddress = Environment.GetEnvironmentVariable("CHAT_SERVER_ADDRESS") ?? "localhost";
     private readonly String _ChatServerPort = Environment.GetEnvironmentVariable("CHAT_SERVER_PORT") ?? "6969";
     private readonly HttpClient _httpClient;
@@ -30,7 +30,7 @@ public class SlackNotificationService : ISlackNotificationService
         var address = Environment.GetEnvironmentVariable("CHAT_SERVER_ADDRESS") ?? "localhost";
         var port = Environment.GetEnvironmentVariable("CHAT_SERVER_PORT") ?? "6969";
         logger.LogDebug("Chat server address: {address}, port: {port}", address, port);
-        _ChatServerUri = $"http://{address}:{port}/api/v1/TaskStorm/event";
+        _ChatServerUri = $"http://{address}:{port}/{_EventEndpoint}";
         logger.LogDebug("Chat server URI set to {uri}", _ChatServerUri);
     }
     public async Task SendIssueCreatedNotificationAsync(Issue issue)
