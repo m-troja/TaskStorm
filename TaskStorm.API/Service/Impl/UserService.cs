@@ -189,7 +189,6 @@ public class UserService : IUserService
             return null;
         }
     }
-
     public async Task<User> GetUserByRefreshTokenAsync(string token)
     {
        l.LogDebug($"Fetching User by RefreshToken = {token}");

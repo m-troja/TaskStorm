@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Mvc;
 using TaskStorm.Log;
 using TaskStorm.Model.DTO;
 using TaskStorm.Model.DTO.Cnv;
+using TaskStorm.Model.Entity;
 using TaskStorm.Service;
 
 namespace TaskStorm.Controller;
@@ -80,5 +81,28 @@ public class UserController : ControllerBase
 
         await _us.DeleteUserById(id);
         return Ok($"Deleted user {id}");
+    }
+
+    [HttpPut("{id:int}")]
+    public async Task<ActionResult<UserDto>> UpdateUser(int id, [FromBody] UpdateUserDto dto)
+    {
+        _logger.LogInformation($"Triggered endpoint UpdateUser {id}");
+
+        var user = await _us.GetByIdAsync(id);
+        if (user == null)
+        {
+            _logger.LogWarning($"User with id {id} not found for update");
+            return NotFound($"User with id {id} was not found");
+        }
+
+        user.FirstName = dto.FirstName;
+        user.LastName = dto.LastName;
+        user.Email = dto.Email;
+        user.SlackUserId = dto.SlackUserId;
+        user.Disabled = dto.Disabled;
+
+        await _us.UpdateUserAsync(user);
+
+        return Ok(_userCnv.ConvertUserToDto(user));
     }
 }

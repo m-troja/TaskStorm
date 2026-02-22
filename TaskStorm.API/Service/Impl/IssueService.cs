@@ -43,43 +43,45 @@ public class IssueService : IIssueService
 
     public async Task<Issue> CreateIssueAsync(CreateIssueRequest req)
     {
+        var reqValidated = await ValidateCreateIssueRequest(req);
+
         await createSystemUserId();
 
-        l.LogDebug($"Starting issue creation for authorId: {req.assigneeId}, projectId: {req.projectId}");
+        l.LogDebug($"Starting issue creation for authorId: {reqValidated.assigneeId}, projectId: {reqValidated.projectId}");
 
-        User author = await _userService.GetByIdAsync(req.authorId);
-        int AuthorIdToSet = req.authorId != 0 ? req.authorId : SystemUserId;
+        User author = await _userService.GetByIdAsync(reqValidated.authorId);
+        int AuthorIdToSet = reqValidated.authorId != 0 ? reqValidated.authorId : SystemUserId;
         var authorToSet = author != null ? author : await _userService.GetByIdAsync(SystemUserId);
-        User ? assignee = req.assigneeId.HasValue ? await _userService.GetByIdAsync(req.assigneeId.Value) : await _userService.GetByIdAsync(SystemUserId);
+        User ? assignee = reqValidated.assigneeId.HasValue ? await _userService.GetByIdAsync(reqValidated.assigneeId.Value) : await _userService.GetByIdAsync(SystemUserId);
 
         DateTime? dueDateUtc = null;
-        if (!string.IsNullOrEmpty(req.dueDate))
+        if (!string.IsNullOrEmpty(reqValidated.dueDate))
         {
-            dueDateUtc = DateTime.SpecifyKind(DateTime.Parse(req.dueDate), DateTimeKind.Utc);
+            dueDateUtc = DateTime.SpecifyKind(DateTime.Parse(reqValidated.dueDate), DateTimeKind.Utc);
             l.LogDebug($"Parsed due date UTC: {dueDateUtc}");
         }
 
         IssuePriority priorityToSet = IssuePriority.NORMAL;
-        if (!string.IsNullOrEmpty(req.priority))
+        if (!string.IsNullOrEmpty(reqValidated.priority))
         {
-            if (!Enum.TryParse<IssuePriority>(req.priority, true, out var parsedPriority) || !Enum.IsDefined(typeof(IssuePriority), parsedPriority))
+            if (!Enum.TryParse<IssuePriority>(reqValidated.priority, true, out var parsedPriority) || !Enum.IsDefined(typeof(IssuePriority), parsedPriority))
             {
-                l.LogDebug($"Invalid issue priority: {req.priority}");
+                l.LogDebug($"Invalid issue priority: {reqValidated.priority}");
             }
             else
             {
-                priorityToSet = Enum.Parse<IssuePriority>(req.priority);
+                priorityToSet = Enum.Parse<IssuePriority>(reqValidated.priority);
             }
         }
 
         Project project;
         try
         {
-            project = await _projectService.GetProjectById(req.projectId.Value);
+            project = await _projectService.GetProjectById(reqValidated.projectId.Value);
         }
         catch (ProjectNotFoundException e)
         {
-            l.LogDebug($"ProjectId {req.projectId} was not found - assigned DummyProjectId={DummyProjectId}");
+            l.LogDebug($"ProjectId {reqValidated.projectId} was not found - assigned DummyProjectId={DummyProjectId}");
             project = await _projectService.GetProjectById(DummyProjectId);
         }
 
@@ -100,8 +102,8 @@ public class IssueService : IIssueService
 
             issue = new Issue
             {
-                Title = req.title,
-                Description = req.description,
+                Title = reqValidated.title,
+                Description = reqValidated.description,
                 Priority = priorityToSet,
                 Author = authorToSet,
                 AuthorId = AuthorIdToSet,
@@ -132,7 +134,7 @@ public class IssueService : IIssueService
         }
         catch (System.Exception )
         {
-            l.LogDebug($"Error occurred while creating issue for project {req.projectId}");
+            l.LogDebug($"Error occurred while creating issue for project {reqValidated.projectId}");
             await transaction.RollbackAsync();
             throw;
         }
@@ -142,7 +144,32 @@ public class IssueService : IIssueService
 
         return issue;
     }
+    private async Task<CreateIssueRequest> ValidateCreateIssueRequest(CreateIssueRequest req)
+    {
+        if (string.IsNullOrEmpty(req.title)) throw new BadRequestException("Title cannot be empty");
+        if (req.authorId < 1) throw new BadRequestException("AuthorId must be positive");
+        if (req.projectId == null) throw new BadRequestException("ProjectId must be provided");
+        if (req.priority != null && (!Enum.TryParse<IssuePriority>(req.priority, true, out var _) || !Enum.IsDefined(typeof(IssuePriority), Enum.Parse<IssuePriority>(req.priority, true))))
+        {
+            throw new BadRequestException($"Invalid issue priority: {req.priority}");
+        }
+        if (req.dueDate != null && !DateTime.TryParse(req.dueDate, out var _))
+        {
+            throw new BadRequestException($"Invalid due date format: {req.dueDate}");
+        }
+        if (req.assigneeId.HasValue && req.assigneeId.Value < -1)
+        {
+            throw new BadRequestException("AssigneeId must be greater than or equal to -1");
+        }
+        if (req.authorId != -1 && !_db.Users.Any(u => u.Id == req.authorId)) throw new BadRequestException("Author user was not found");
+        if (req.assigneeId.HasValue && req.assigneeId.Value != -1 && !_db.Users.Any(u => u.Id == req.assigneeId.Value)) throw new BadRequestException("Assignee user was not found");
+        string title = req.title;
+        if (req.title.Length > 255) title = req.title.Substring(0, 255);
+        string description = req.description;
+        if (req.description != null && req.description.Length > 1000) description = req.description.Substring(0, 1000);
+        return new CreateIssueRequest(title, description, req.priority, req.authorId, req.assigneeId, req.dueDate, req.projectId);
 
+    }
 
     public async Task<IssueDto> GetIssueDtoByIdAsync(int id)
     {
