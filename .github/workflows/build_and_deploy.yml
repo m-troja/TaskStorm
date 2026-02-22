@@ -1,7 +1,6 @@
 name: Build and version
 on:
   push:
-    branches: [main]
     tags:
       - "*"
 jobs:
