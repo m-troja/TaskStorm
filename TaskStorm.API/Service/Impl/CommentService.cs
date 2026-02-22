@@ -55,8 +55,10 @@ public class CommentService : ICommentService
     {
         List<Comment> comments = await _db.Comments.Where(c => c.IssueId == issueId)
             .Include(c => c.Author)
+            .Include(c => c.Attachments)
             .ToListAsync();
-
+        logger.LogDebug($"Retrieved {comments.Count} comments for IssueId={issueId}");
+        comments.ForEach(c => logger.LogDebug($"Comment Id={c.Id}, AuthorId={c.AuthorId}, Content='{c.Content}', attachments = {c.Attachments.Count}"));
         return _commentCnv.EntityListToDtoList(comments);
     }
 

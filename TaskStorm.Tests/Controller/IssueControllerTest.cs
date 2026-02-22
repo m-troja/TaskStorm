@@ -256,7 +256,7 @@ public class IssueControllerTest
 
         var issues = new List<IssueDto>();
 
-        mi.Setup(s => s.GetAllIssuesByUserId(1)).ReturnsAsync(issues);
+        mi.Setup(s => s.GetIssuesByUserId(1)).ReturnsAsync(issues);
 
         var result = await controller.GetAllIssuesByUserId(1);
 
@@ -272,7 +272,7 @@ public class IssueControllerTest
 
         var issues = new List<IssueDto>();
 
-        mi.Setup(s => s.GetAllIssuesByProjectId(1)).ReturnsAsync(issues);
+        mi.Setup(s => s.GetIssuesByProjectId(1)).ReturnsAsync(issues);
 
         var result = await controller.GetAllIssuesByProjectId(1);
 

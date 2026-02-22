@@ -43,6 +43,7 @@ namespace TaskStorm.Exception.Handler
                     InvalidProjectData => StatusCodes.Status400BadRequest,
                     InvalidRefreshTokenException => StatusCodes.Status400BadRequest,
                     GptConnectionException => StatusCodes.Status408RequestTimeout,
+                    BadRequestException => StatusCodes.Status400BadRequest,
                     _ => StatusCodes.Status500InternalServerError
                 };
                 var errorResponse = new TaskStorm.Exception.Error.ErrorResponse(
@@ -59,6 +60,7 @@ namespace TaskStorm.Exception.Handler
                         InvalidProjectData => TaskStorm.Exception.Error.ErrorType.INVALID_PROJECT_DATA,
                         InvalidRefreshTokenException => TaskStorm.Exception.Error.ErrorType.INVALID_REFRESH_TOKEN,
                         GptConnectionException => TaskStorm.Exception.Error.ErrorType.GPT_ERROR,
+                        BadRequestException => TaskStorm.Exception.Error.ErrorType.BAD_REQUEST,
                         _ => TaskStorm.Exception.Error.ErrorType.SERVER_ERROR
                     },
                     ex.Message

@@ -445,7 +445,7 @@ public class IssueServiceTests
 
         await AddIssueWithKey(db, new Issue { Title = "1", Author = user, Project = project, ProjectId = 100 }, project);
 
-        var result = await service.GetAllIssuesByProjectId(100);
+        var result = await service.GetIssuesByProjectId(100);
 
         Assert.Single(result);
     }
@@ -468,7 +468,7 @@ public class IssueServiceTests
 
         await AddIssueWithKey(db, new Issue { Title = "Test",  Assignee = user, AssigneeId = 10, Author = user, Project = project, ProjectId = 100 }, project);
 
-        var result = await service.GetAllIssuesByUserId(10);
+        var result = await service.GetIssuesByUserId(10);
 
         Assert.Single(result);
     }

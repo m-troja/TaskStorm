@@ -5,7 +5,7 @@ namespace TaskStorm.Service
 {
     public interface IFileService
 {
-        Task<int> SaveImageAsync(FileUploadRequest req);
+        Task<int> SaveImageAsync(IFormFile file, string commentId);
         Task DeleteFileAsync(int id);
         Task<CommentAttachment>? GetFileById(int id);
     }

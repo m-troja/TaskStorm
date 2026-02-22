@@ -1,4 +1,6 @@
-﻿namespace TaskStorm.Model.DTO;
+﻿using TaskStorm.Model.IssueFolder;
+
+namespace TaskStorm.Model.DTO;
 
 public record CommentDto(
     int Id, 
@@ -7,7 +9,8 @@ public record CommentDto(
     int AuthorId, 
     DateTime CreatedAt,
     DateTime UpdatedAt,
-    string authorName
+    string authorName,
+    ICollection<int>? attachmentIds
     )
 {
 }

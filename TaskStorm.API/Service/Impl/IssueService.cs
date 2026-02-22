@@ -1,8 +1,10 @@
 ﻿using Microsoft.EntityFrameworkCore;
 using System.Text;
 using TaskStorm.Data;
+using TaskStorm.Exception;
 using TaskStorm.Exception.IssueException;
 using TaskStorm.Exception.ProjectException;
+using TaskStorm.Exception.UserException;
 using TaskStorm.Model.DTO;
 using TaskStorm.Model.DTO.Cnv;
 using TaskStorm.Model.Entity;
@@ -141,12 +143,6 @@ public class IssueService : IIssueService
         return issue;
     }
 
-    public Task<bool> DeleteIssueAsync(int id)
-    {
-        l.LogDebug($"DeleteIssueAsync is not implemented yet for issueId {id}");
-        throw new NotImplementedException();
-    }
-
     public Task<IEnumerable<Issue>> GetAllAsync()
     {
         l.LogDebug($"GetAllAsync is not implemented yet");
@@ -156,7 +152,7 @@ public class IssueService : IIssueService
     public async Task<IssueDto> GetIssueDtoByIdAsync(int id)
     {
         l.LogDebug($"Fetching issue DTO for issueId {id}");
-        Issue issue = await GetIssueByIdAsync(id);
+        var issue = await GetIssueFromDb(id) ;
         l.LogDebug($"Fetching done");
 
         if (issue.Key == null)
@@ -180,14 +176,9 @@ public class IssueService : IIssueService
     public async Task<Issue> GetIssueByIdAsync(int id)
     {
         l.LogDebug($"Fetching issue entity for issueId {id}");
-        Issue? issue = await _db.Issues
-                                  .Include(i => i.Key)      
-                                  .Include(i => i.Author)
-                                  .Include(i => i.Assignee)
-                                  .Include(i => i.Project)  
-                                  .Include(i => i.Comments)  
-                                  .FirstOrDefaultAsync(i => i.Id == id); 
-        l.LogDebug($"Fetched issue: {issue}");
+        Issue? issue = await GetIssueFromDb(id); 
+
+        l.LogDebug($"Fetched issue: {issue.Id}");
 
         return issue ?? throw new IssueNotFoundException("Issue " + id + " was not found");
     }
@@ -195,37 +186,27 @@ public class IssueService : IIssueService
     {
         l.LogDebug($"Fetching issue DTO for key {keyString}");
         int issueId = GetIssueIdInsideProjectFromKey(keyString);
-        Project? project = await GetProjectFromKey(keyString);
 
-        Issue? issue = await _db.Issues
-            .Where(i => i.Id == issueId)
-            .Where(i => i.Project != null && i.Project.ShortName == project.ShortName)
-            .Include(i => i.Key)
-            .Include(i => i.Project)
-            .Include(i => i.Comments)
-            .FirstOrDefaultAsync();
-        l.LogDebug($"Fetched issue: {issue}");
-        if (issue == null) throw new IssueNotFoundException("Issue was not found");
-        l.LogDebug($"issue.Key {issue.Key}");
+        var issue = await GetIssueFromDb(issueId);
 
-        IssueDto issueDto = _issueCnv.ConvertIssueToIssueDto(issue);
-        l.LogDebug($"Converted issue to DTO: {issueDto}");
-        return issueDto;
+        return _issueCnv.ConvertIssueToIssueDto(issue);
     }
 
-    public async Task<Issue> AssignIssueAsync(AssignIssueRequest air)
+    public async Task<Issue> AssignIssueAsync(AssignIssueRequest req)
     {
-        l.LogDebug($"Assigning issue {air.IssueId} to user {air.AssigneeId}");
-        User newAssignee = await _userService.GetByIdAsync(air.AssigneeId);
+        l.LogDebug($"Assigning issue {req.IssueId} to user {req.AssigneeId}");
+        var newAssignee = await _db.Users.AnyAsync(u => u.Id == req.AssigneeId) ? await _userService.GetByIdAsync(req.AssigneeId) : throw new BadRequestException("Assignee user was not found") ;
         l.LogDebug($"Fetched new assignee: {newAssignee}");
-        Issue issue = await GetIssueByIdAsync(air.IssueId);
-        User? oldAssignee = null;
+        var issue = await GetIssueFromDb(req.IssueId);
+
+        User? oldAssignee;
         if (issue.AssigneeId.HasValue && issue.AssigneeId != 0) {
-            oldAssignee = await _userService.GetByIdAsync(issue.AssigneeId.Value);  }
+            oldAssignee = await _db.Users.FirstOrDefaultAsync(u => u.Id == issue.AssigneeId); }
         else  {
             l.LogDebug("Old assignee was null or 0, assigning to system user for activity log");
-            oldAssignee = await _userService.GetByIdAsync(SystemUserId);
+            oldAssignee = await _db.Users.FirstOrDefaultAsync(u => u.Id == SystemUserId);
         };
+        
         issue.Assignee = newAssignee;
         issue.AssigneeId = newAssignee.Id;
         l.LogDebug($"Set assignee {issue.Assignee} for issue {issue.Id}");
@@ -234,7 +215,6 @@ public class IssueService : IIssueService
         l.LogDebug($"Updated issue {updatedIssue.Id} in database");
 
         var activity = await _activityService.CreateActivityPropertyUpdatedAsync(ActivityType.UPDATED_ASSIGNEE, (oldAssignee.Id).ToString(), (newAssignee.Id).ToString(), issue.Id);
-        l.LogDebug($"Preparing to send issue assigned notification for issue {issue.Id} to ChatGPT");
         await _slackNotificationService.SendIssueAssignedNotificationAsync(issue);
         l.LogDebug($"Sent issue assigned notification for issue {issue.Id} to ChatGPT");
         return updatedIssue;
@@ -250,7 +230,7 @@ public class IssueService : IIssueService
         return issue;
     }
 
-    public int GetIssueIdInsideProjectFromKey(string key)
+    private int GetIssueIdInsideProjectFromKey(string key)
     {
         l.LogDebug($"Getting issueId from key {key}");
         int lastDash = key.LastIndexOf('-');
@@ -262,7 +242,7 @@ public class IssueService : IIssueService
         return number;
     }
     
-    public async Task<Project> GetProjectFromKey(string key)
+    private async Task<Project> GetProjectFromKey(string key)
     {
         l.LogDebug($"Getting project from key {key}");
         int lastDash = key.LastIndexOf('-');
@@ -274,7 +254,7 @@ public class IssueService : IIssueService
         return project;
     }
 
-    public async Task<Issue> UpdateIssueAsync(Issue issue)
+    private async Task<Issue> UpdateIssueAsync(Issue issue)
     {
         l.LogDebug($"Updating issue {issue.Id}");
         issue.UpdatedAt = DateTime.UtcNow;
@@ -283,11 +263,11 @@ public class IssueService : IIssueService
         return issue;
     }
 
-    public async Task<IssueDto> RenameIssueAsync(RenameIssueRequest rir)
+    public async Task<IssueDto> RenameIssueAsync(RenameIssueRequest req)
     {
-        l.LogDebug($"Renaming issue {rir.id} to new title: {rir.newTitle}");
-        Issue issue = await GetIssueByIdAsync(rir.id);
-        issue.Title = rir.newTitle;
+        l.LogDebug($"Renaming issue {req.id} to new title: {req.newTitle}");
+        Issue issue = await GetIssueFromDb(req.id);
+        issue.Title = req.newTitle;
         Issue updatedIssue = await UpdateIssueAsync(issue);
         l.LogDebug($"Renamed issue {updatedIssue.Id} successfully");
         _db.Issues.Update(updatedIssue);
@@ -307,7 +287,7 @@ public class IssueService : IIssueService
             throw new ArgumentException($"Invalid issue status: {req.NewStatus}");
         }
 
-        Issue issue = await GetIssueByIdAsync(req.IssueId);
+        Issue issue = await GetIssueFromDb(req.IssueId);
         IssueStatus oldStatus = issue.Status;
         issue.Status = Enum.Parse<IssueStatus>(req.NewStatus);
 
@@ -328,7 +308,7 @@ public class IssueService : IIssueService
         {
             throw new ArgumentException($"Invalid issue priority: {req.NewPriority}");
         }
-        Issue issue = await GetIssueByIdAsync(req.IssueId);
+        Issue issue = await GetIssueFromDb(req.IssueId);
         IssuePriority? oldPriority = issue.Priority;
         issue.Priority = Enum.Parse<IssuePriority>(req.NewPriority);
         var UpdatedIssue = await UpdateIssueAsync(issue);
@@ -346,7 +326,7 @@ public class IssueService : IIssueService
     {
         l.LogDebug($"Assigning team {req.TeamId} to issue {req.IssueId}");
         Team team = await _teamService.GetTeamByIdAsync(req.TeamId);
-        Issue issue = await GetIssueByIdAsync(req.IssueId);
+        Issue issue = await GetIssueFromDb(req.IssueId);
         issue.Team = team;
         var UpdatedIssue = await UpdateIssueAsync(issue);
         IssueDto issueDto = _issueCnv.ConvertIssueToIssueDto(UpdatedIssue);
@@ -354,29 +334,37 @@ public class IssueService : IIssueService
         return issueDto;
     }
 
-    public async Task<IEnumerable<IssueDto>> GetAllIssuesByUserId(int userId)
+    public async Task<IEnumerable<IssueDto>> GetIssuesByUserId(int userId)
     {
         l.LogDebug($"Getting all issues for userId {userId}");
-        User user = await _userService.GetByIdAsync(userId);
-        List<Issue> issues = await _db.Issues.Where(i => i.AssigneeId == userId || i.AuthorId == userId)
-            .Include(i => i.Key)
-            .Include(i => i.Project)
-            .Include(i => i.Comments)
-            .ToListAsync();
+        if (!await _db.Users.AnyAsync(u => u.Id == userId))
+            throw new UserNotFoundException("User not found");
+        var issueIds = await _db.Issues.Where(i => i.AssigneeId == userId || i.AuthorId == userId).Select(i => i.Id).ToListAsync();
+
+        var issues = await GetListOfIssuesFromDb(issueIds);
+
         l.LogDebug($"Fetched {issues.Count} issues for userId {userId}");
         var issuesDto = _issueCnv.ConvertIssueListToIssueDtoList(issues);
         return issuesDto;
     }
+    public async Task<IEnumerable<IssueDto>> GetIssuesByTeamId(int teamId)
+    {
+        l.LogDebug($"Getting all issues for teamId {teamId}");
+        var team = await _db.Teams.FirstOrDefaultAsync( team => team.Id == teamId) ?? throw new ContentNotFoundException("Team was not found");
 
-    public async Task<IEnumerable<IssueDto>> GetAllIssuesByProjectId(int projectId)
+        var issueIds = await _db.Issues.Where(i => i.TeamId == teamId).Select(i => i.Id).ToListAsync();
+        var issues = await GetListOfIssuesFromDb(issueIds);
+
+        l.LogDebug($"Fetched {issues.Count} issues for userId {teamId}");
+        var issuesDto = _issueCnv.ConvertIssueListToIssueDtoList(issues);
+        return issuesDto;
+    }
+    public async Task<IEnumerable<IssueDto>> GetIssuesByProjectId(int projectId)
     {
         l.LogDebug($"Getting all issues for projectId {projectId}");
         Project project = await _projectService.GetProjectById(projectId);
-        List<Issue> issues = await _db.Issues.Where(i => i.ProjectId == projectId )
-            .Include(i => i.Key)
-            .Include(i => i.Project)
-            .Include(i => i.Comments)
-            .ToListAsync();
+        var issueIds = await _db.Issues.Where(i => i.ProjectId == projectId).Select(i => i.Id).ToListAsync();
+        var issues = await GetListOfIssuesFromDb(issueIds);
         l.LogDebug($"Fetched {issues.Count} issues for projectId {projectId}");
         var issuesDto = _issueCnv.ConvertIssueListToIssueDtoList(issues);
         return issuesDto;
@@ -387,21 +375,15 @@ public class IssueService : IIssueService
         int IssueIdInProject = GetIssueIdInsideProjectFromKey(key);
         if (IssueIdInProject == 0) throw new IssueNotFoundException("Issue was not found");
         Project project = await GetProjectFromKey(key);
-        Issue issue = await _db.Issues
-            .Where(i => i.ProjectId == project.Id && i.IdInsideProject == IssueIdInProject)
-            .FirstOrDefaultAsync() ?? throw new ArgumentNullException("Issue was not found") ;
-        if (issue == null) throw new IssueNotFoundException("Issue was not found");
-        return issue.Id;
+        int issueId = await _db.Issues.Where(i => i.ProjectId == project.Id && i.IdInsideProject == IssueIdInProject).Select(i => i.Id).FirstOrDefaultAsync();
+        l.LogDebug($"Fetched issueId {issueId} from key {key}");
+        return issueId;
     }
 
     public async Task<IssueDto> UpdateDueDateAsync(UpdateDueDateRequest req)
     {
-        if (req is null) throw new ArgumentNullException(nameof(req));
-        if (req.IssueId <= 0)  throw new ArgumentException("IssueId must be positive.", nameof(req.IssueId));
-        if (!req.DueDate.HasValue) throw new ArgumentException("DueDate cannot be null.", nameof(req.DueDate));
-
         DateTime dueDateUtc = DateTime.SpecifyKind(req.DueDate.Value, DateTimeKind.Utc);
-        Issue issue = await GetIssueByIdAsync(req.IssueId);
+        Issue issue = await GetIssueFromDb(req.IssueId);
         issue.DueDate = dueDateUtc;
         l.LogDebug($"Set due date {issue.DueDate} for issue {issue.Id}");
         Issue updatedIssue = await UpdateIssueAsync(issue);
@@ -425,7 +407,7 @@ public class IssueService : IIssueService
              req.dueDate,
              req.projectId != null ? req.projectId.Value : DummyProjectId   
          );
-        Issue issue = await CreateIssueAsync(createIssueRequest);
+        var issue = await CreateIssueAsync(createIssueRequest);
         var issueDto = _issueCnv.ConvertIssueToIssueDtoChatGpt(issue);
         l.LogDebug($"Created issue via Slack successfully: {issueDto}");
         return issueDto;
@@ -433,13 +415,11 @@ public class IssueService : IIssueService
 
     public async Task<IEnumerable<IssueDto>> GetAllIssues()
     {
-        List<Issue> issues = await _db.Issues
-            .Include(i => i.Key)
-            .Include(i => i.Project)
-            .Include(i => i.Comments).ThenInclude(c => c.Author)
-            .ToListAsync();
+        var issueIds = await _db.Issues.Select(i => i.Id).ToListAsync();
+        var issues = await GetListOfIssuesFromDb(issueIds);
+
         List<IssueDto> issueDtos = _issueCnv.ConvertIssueListToIssueDtoList(issues).ToList();
-        l.LogDebug($"Fetched total {issueDtos.Count} issues from database");
+        l.LogDebug($"GetAllIssues Fetched total {issueDtos.Count} issues from database");
         return issueDtos;
     }
 
@@ -449,9 +429,9 @@ public class IssueService : IIssueService
         l.LogInformation("Deleted all issues from database");
     }
 
-    public async Task deleteIssueById(int id)
+    public async Task DeleteIssueByIdAsync(int id)
     {
-        await _db.Database.ExecuteSqlAsync($"DELETE FROM Issues WHERE id = {id}");
+        await _db.Database.ExecuteSqlRawAsync("DELETE FROM Issues WHERE id = {0}", id);
         l.LogInformation($"Deleted issue where Id={id}");
     }
 
@@ -466,5 +446,36 @@ public class IssueService : IIssueService
             await _db.SaveChangesAsync();
             l.LogInformation("Created system user");
         }
+    }
+
+    private async Task<Issue> GetIssueFromDb(int id)
+    {
+        l.LogDebug($"Fetching issue entity for issueId {id}");
+        Issue? issue = await _db.Issues
+                                  .Include(i => i.Key)
+                                  .Include(i => i.Author)
+                                  .Include(i => i.Assignee)
+                                  .Include(i => i.Project)
+                                    .Include(i => i.Comments).ThenInclude(c => c.Author)
+                                    .Include(i => i.Team)
+                                  .FirstOrDefaultAsync(i => i.Id == id);
+        l.LogDebug($"Fetched issue: {issue}");
+
+        return issue ?? throw new IssueNotFoundException("Issue " + id + " was not found");
+    }
+
+    private async Task<List<Issue>> GetListOfIssuesFromDb(List<int> ids)
+    {
+        l.LogDebug($"GetListOfIssuesFromDb for issueIds {string.Join(", ", ids)}");
+        var issues = await _db.Issues
+            .Where(i => ids.Contains(i.Id))
+            .Include(i => i.Key)
+            .Include(i => i.Author)
+            .Include(i => i.Assignee)
+            .Include(i => i.Project)
+            .Include(i => i.Comments).ThenInclude(c => c.Author)
+            .Include(i => i.Team)
+            .ToListAsync();
+        return issues;
     }
 }

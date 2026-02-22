@@ -1,6 +1,7 @@
 ﻿using Microsoft.EntityFrameworkCore;
 using System.Xml.Linq;
 using TaskStorm.Data;
+using TaskStorm.Exception;
 using TaskStorm.Exception.UserException;
 using TaskStorm.Model.DTO;
 using TaskStorm.Model.DTO.Cnv;
@@ -45,7 +46,8 @@ public class TeamService : ITeamService
     {
         l.LogDebug($"Getting team by id: {id}");
         var team = await _db.Teams
-            .Include(t => t.Users)
+            .Include(t => t.Users).
+            Include(t => t.Issues)
             .FirstOrDefaultAsync(t => t.Id == id);
         if (team == null)
         {
@@ -105,11 +107,12 @@ public class TeamService : ITeamService
 
         var team = await _db.Teams
             .Include(t => t.Users)
+            .Include(t => t.Issues)
             .FirstOrDefaultAsync(t => t.Id == teamId)
             ?? throw new KeyNotFoundException($"Team {teamId} not found");
 
         if (user.Teams.Any(t => t.Id == teamId))
-            throw new ArgumentException($"User {userId} already in team {teamId}");
+            throw new BadRequestException($"User {userId} already in team {teamId}");
         user.Teams.Add(team);
         await _db.SaveChangesAsync();
         l.LogDebug($"User with id: {userId} added to team with id: {teamId}");
@@ -124,11 +127,11 @@ public class TeamService : ITeamService
         if (teamById.Users == null)
         {
             l.LogDebug($"Team {teamId} contains no users");
-            throw new ArgumentException($"Team {teamId} contains no users");
+            throw new BadRequestException($"Team {teamId} contains no users");
         }
         else if (!teamById.Users.Any(u => u.Id == userId)) {
             l.LogDebug($"User with id: {userId} is not in team with id: {teamId}");
-            throw new ArgumentException($"User with id: {userId} is not in team with id: {teamId}");
+            throw new BadRequestException($"User with id: {userId} is not in team with id: {teamId}");
         }
 
         teamById.Users.Remove(userById);

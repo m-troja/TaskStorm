@@ -1,6 +1,7 @@
 ﻿using Microsoft.EntityFrameworkCore;
 using System.ComponentModel.DataAnnotations;
 using TaskStorm.Data;
+using TaskStorm.Exception;
 using TaskStorm.Exception.Registration;
 using TaskStorm.Exception.UserException;
 using TaskStorm.Log;
@@ -36,24 +37,24 @@ public class RegisterService : IRegisterService
         _chatGptService = chatGptService;
     }
 
-    public async Task<User> Register(RegistrationRequest request)
+    public async Task<User> Register(RegistrationRequest req)
     {
-        if (request == null)
+        if (req == null)
         {
             _logger.LogError("Registration request is null");
             throw new RegisterEmailException("Registration request cannot be null");
         }
 
-        if (string.IsNullOrWhiteSpace(request.Email) ||
-            string.IsNullOrWhiteSpace(request.Password) ||
-            string.IsNullOrWhiteSpace(request.FirstName) ||
-            string.IsNullOrWhiteSpace(request.LastName))
+        if (string.IsNullOrWhiteSpace(req.Email) ||
+            string.IsNullOrWhiteSpace(req.Password) ||
+            string.IsNullOrWhiteSpace(req.FirstName) ||
+            string.IsNullOrWhiteSpace(req.LastName))
         {
             _logger.LogError("Registration failed: Missing required fields");
             throw new RegisterEmailException("Missing required fields");
         }
 
-        string email = request.Email.Trim().ToLower();
+        string email = req.Email.Trim().ToLower();
         _logger.LogInformation($"Received registration request for email: {email}");
 
         if (!new EmailAddressAttribute().IsValid(email))
@@ -68,30 +69,24 @@ public class RegisterService : IRegisterService
             throw new UserAlreadyExistsException("Email already registered");
         }
 
-        
         // Generate salt and hash password
         byte[] salt = _passwordService.GenerateSalt();
-        string hashedPassword = _passwordService.HashPassword(request.Password, salt);
+        string hashedPassword = _passwordService.HashPassword(req.Password, salt);
 
         // Get role
         Role role = await _roleService.GetRoleByName(Role.ROLE_USER);
 
-        var userBySlackUserId = await GetUserBySlackUserId(request.SlackUserId);
+        User? userBySlackUserId = await GetUserBySlackUserId(req.SlackUserId);
         if (userBySlackUserId != null)
         {
-            userBySlackUserId.FirstName = request.FirstName;
-            userBySlackUserId.LastName = request.LastName;
-            userBySlackUserId.Email = email;
-            userBySlackUserId.Password = hashedPassword;
-            userBySlackUserId.Salt = salt;
-            userBySlackUserId.Disabled = false;
-            userBySlackUserId.Roles.Add(role);
-            _db.Users.Update(userBySlackUserId);
-            await _db.SaveChangesAsync();
-            _logger.LogInformation($"User registered successfully with SlackUserId: {request.SlackUserId}");
-            return userBySlackUserId;
+            _logger.LogError($"User with SlackUserId {req.SlackUserId} already exists - throwing exception");
+            throw new UserAlreadyExistsException($"User with SlackUserId {req.SlackUserId} already exists - not registering user");
         }
-        var user = new User(request.FirstName, request.LastName, email, hashedPassword, salt, role) { SlackUserId = request.SlackUserId };
+        var user = new User(req.FirstName, req.LastName, email, hashedPassword, salt, role)
+        {
+            Disabled = false,
+            SlackUserId = req.SlackUserId 
+        };
 
         _db.Users.Add(user);
         await _db.SaveChangesAsync();
@@ -102,7 +97,7 @@ public class RegisterService : IRegisterService
 
     private async Task<User?> GetUserBySlackUserId(string slackUserId)
     {
-        var user = await _db.Users.Where(u => u.SlackUserId == slackUserId).FirstOrDefaultAsync();
+        var user = await _db.Users.FirstOrDefaultAsync(u => u.SlackUserId == slackUserId);
         if (user == null)
         {
             _logger.LogDebug("No user found with SlackUserId: {SlackUserId}", slackUserId);

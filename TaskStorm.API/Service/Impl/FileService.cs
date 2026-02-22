@@ -24,11 +24,8 @@ public class FileService : IFileService
         BuildResourceFolder();
     }
 
-    public async Task<int> SaveImageAsync(FileUploadRequest req)
+    public async Task<int> SaveImageAsync(IFormFile file, string commentId)
     {
-        var file = req.File;
-        var commentId = req.CommentId;
-
         if (!ValidateFile(file))
             throw new InvalidOperationException("Invalid file type.");
 

@@ -29,9 +29,11 @@ public class RegisterController : ControllerBase
     [HttpPost]
     public async Task<ActionResult<UserDto>> RegisterUser([FromBody] RegistrationRequest req)
     {
+        _logger.LogInformation("Received RegisterUser req: FirstName={} LastName={} email={} SlackUserId={}", req.FirstName, req.LastName, req.Email, req.SlackUserId);
+        
         if (req == null)
         {
-            _logger.LogError("Received null registration request");
+            _logger.LogError("req == null -> throwing BadRequest");
             return BadRequest("Request cannot be null");
         }
 
@@ -43,7 +45,7 @@ public class RegisterController : ControllerBase
         }
         catch (RegisterEmailException ex)
         {
-            _logger.LogWarning(ex, "Registration failed due to invalid input");
+            _logger.LogWarning(ex, "Registration failed due to invalid email address");
             return BadRequest(new { Message = ex.Message });
         }
         catch (UserAlreadyExistsException ex)
@@ -54,7 +56,7 @@ public class RegisterController : ControllerBase
         catch (System.Exception ex)
         {
             _logger.LogError(ex, "Unexpected error during registration");
-            return StatusCode(500, new { Message = "Internal server error" });
+            return StatusCode(500, new { Message = "Unexpected error during registration" });
         }
     }
 }

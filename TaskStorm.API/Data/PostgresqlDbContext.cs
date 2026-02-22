@@ -165,7 +165,7 @@ public class PostgresqlDbContext : DbContext
 
         // Comment -- Attachment
         modelBuilder.Entity <Comment>()
-            .HasMany(c => c.attachments)
+            .HasMany(c => c.Attachments)
             .WithOne(a => a.Comment)
             .HasForeignKey(a => a.CommentId)
             .OnDelete(DeleteBehavior.Cascade);

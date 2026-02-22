@@ -13,6 +13,7 @@
         INVALID_PROJECT_DATA,
         USER_DISABLED,
         INVALID_REFRESH_TOKEN,
-        GPT_ERROR
+        GPT_ERROR,
+        BAD_REQUEST
     }
 }

@@ -19,6 +19,6 @@ public class Comment
         Issue = issue;
     }
 
-    public ICollection<CommentAttachment>? attachments { get; set; } = new List<CommentAttachment>();
+    public ICollection<CommentAttachment>? Attachments { get; set; } = new List<CommentAttachment>();
     public Comment() { }
 }

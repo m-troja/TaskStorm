@@ -1,5 +1,6 @@
 ﻿using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using TaskStorm.Exception;
 using TaskStorm.Exception.IssueException;
 using TaskStorm.Log;
 using TaskStorm.Model.DTO;
@@ -45,6 +46,12 @@ public class IssueController : ControllerBase
     [HttpGet("key/{key}")]
     public async Task<ActionResult<IssueDto>> GetIssueByKey(string key)
     {
+        if (key == null || key == string.Empty || key.Length == 0)
+        {
+            l.LogDebug($"issue.key is null");
+            throw new BadRequestException("key cannot be empty");
+        }
+
         l.LogDebug($"Received get issue by key request: {key}");
         var IssueDto = await _is.GetIssueDtoByKeyAsync(key);
 
@@ -60,7 +67,15 @@ public class IssueController : ControllerBase
         return Ok(issues);
 
     }
-    [HttpGet("id/{id}")]
+    [HttpGet("team/{id:int}")]
+    public async Task<ActionResult<List<IssueDto>>> GetIssuesByTeamId(int id)
+    {
+        l.LogDebug("Received GetIssuesByTeamId: {id}", id);
+        var issues = await _is.GetIssuesByTeamId(id);
+        return Ok(issues);
+
+    }
+    [HttpGet("id/{id:int}")]
     public async Task<ActionResult<IssueDto>> GetIssueById(int id)
     {
         l.LogDebug($"Received get issue by id request: {id}");
@@ -112,6 +127,12 @@ public class IssueController : ControllerBase
     [HttpPut("update-due-date")]
     public async Task<ActionResult<IssueDto>> UpdateDueDate([FromBody] UpdateDueDateRequest req)
     {
+        if (req is null || req.IssueId <= 0 || !req.DueDate.HasValue)
+        {
+            l.LogDebug($"Invalid UpdateDueDateRequest");
+            throw new BadRequestException("Invalid request. IssueId must be positive and DueDate cannot be null.");
+        }
+
         l.LogDebug($"Received update due date request: {req.IssueId}, {req.DueDate}");
         IssueDto issueDto = await _is.UpdateDueDateAsync(req);
         return Ok(issueDto);
@@ -121,7 +142,7 @@ public class IssueController : ControllerBase
     public async Task<ActionResult<List<IssueDto>>> GetAllIssuesByUserId(int userId)
     {
         l.LogDebug($"Received get all issues by user id request: {userId}");
-        var issuesDto = await _is.GetAllIssuesByUserId(userId);
+        var issuesDto = await _is.GetIssuesByUserId(userId);
         return Ok(issuesDto);
     }
 
@@ -129,7 +150,7 @@ public class IssueController : ControllerBase
     public async Task<ActionResult<List<IssueDto>>> GetAllIssuesByProjectId(int projectId)
     {
         l.LogDebug($"Received get all issues by project id request: {projectId}");
-        var issuesDto = await _is.GetAllIssuesByProjectId(projectId);
+        var issuesDto = await _is.GetIssuesByProjectId(projectId);
         return Ok(issuesDto);
     }
 
@@ -137,7 +158,7 @@ public class IssueController : ControllerBase
     public async Task<ActionResult<string>> DeletelIssueById(int id)
     {
         l.LogInformation($"Triggered endpoint DeletelIssueById {id}");
-        await _is.deleteIssueById(id);
+        await _is.DeleteIssueByIdAsync(id);
         return Ok($"Deleted issue {id}");
     }
 
