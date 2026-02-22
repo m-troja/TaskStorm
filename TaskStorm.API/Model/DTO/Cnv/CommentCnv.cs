@@ -14,14 +14,16 @@ public class CommentCnv
         var authorFullName = comment.Author != null
             ? $"{comment.Author.FirstName} {comment.Author.LastName}"
             : string.Empty;
+        var authorSlackUserId = comment.Author != null
+            ? $"{comment.Author.SlackUserId}"
+            : string.Empty;
 
         l.LogDebug("Converting Comment entity to CommentDto. Id: {Id}, ContentLength: {Length}, Author: {Author}", comment.Id, comment.Content?.Length ?? 0, authorFullName);
         
         var attachmentIds = (comment.Attachments ?? Enumerable.Empty<CommentAttachment>())
              .Select(a => a.Id)
              .ToList();
-
-        return new CommentDto(
+        var dto= new CommentDto(
             comment.Id,
             comment.IssueId,
             comment.Content ?? "",
@@ -29,8 +31,11 @@ public class CommentCnv
             comment.CreatedAt,
             comment.UpdatedAt,
             authorFullName,
-            attachmentIds
+            attachmentIds,
+            authorSlackUserId
             );
+        l.LogDebug($"converted {comment} to {dto}");
+        return dto;
     }
 
     public ICollection<CommentDto> EntityListToDtoList(ICollection<Comment> comments)

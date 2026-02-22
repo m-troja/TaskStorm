@@ -10,7 +10,8 @@ public record CommentDto(
     DateTime CreatedAt,
     DateTime UpdatedAt,
     string authorName,
-    ICollection<int>? attachmentIds
+    ICollection<int>? attachmentIds,
+    string authorSlackId
     )
 {
 }
