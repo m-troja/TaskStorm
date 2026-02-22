@@ -96,7 +96,7 @@ public class IssueController : ControllerBase
     public async Task<ActionResult<IssueDto>> RenameIssue([FromBody] RenameIssueRequest req)
     {
         l.LogDebug($"Received rename issue request: {req.id}, {req.newTitle}");
-        IssueDto issueDto = await _is.RenameIssueAsync(req);
+        var issueDto = await _is.RenameIssueAsync(req);
         return Ok(issueDto);
     }
 
@@ -104,7 +104,7 @@ public class IssueController : ControllerBase
     public async Task<ActionResult<IssueDto>> AssignTeam([FromBody] AssignTeamRequest req)
     {
         l.LogDebug($"Received AssignTeam request: {req.IssueId}, {req.TeamId}");
-        IssueDto issueDto = await _is.AssignTeamAsync(req);
+        var issueDto = await _is.AssignTeamAsync(req);
         return Ok(issueDto);
     }
 
@@ -112,7 +112,7 @@ public class IssueController : ControllerBase
     public async Task<ActionResult<IssueDto>> ChangeIssueStatus([FromBody] ChangeIssueStatusRequest req)
     {
         l.LogDebug($"Received update issue status request: {req.IssueId}, {req.NewStatus}");
-        IssueDto issueDto = await _is.ChangeIssueStatusAsync(req);
+        var issueDto = await _is.ChangeIssueStatusAsync(req);
         return Ok(issueDto);
     }
 
@@ -120,7 +120,7 @@ public class IssueController : ControllerBase
     public async Task<ActionResult<IssueDto>> UpdateIssuePriority([FromBody] ChangeIssuePriorityRequest req)
     {
         l.LogDebug($"Received update issue priority request: {req.IssueId}, {req.NewPriority}");
-        IssueDto issueDto = await _is.ChangeIssuePriorityAsync(req);
+        var issueDto = await _is.ChangeIssuePriorityAsync(req);
         return Ok(issueDto);
     }
 
@@ -134,7 +134,7 @@ public class IssueController : ControllerBase
         }
 
         l.LogDebug($"Received update due date request: {req.IssueId}, {req.DueDate}");
-        IssueDto issueDto = await _is.UpdateDueDateAsync(req);
+        var issueDto = await _is.UpdateDueDateAsync(req);
         return Ok(issueDto);
     }
 

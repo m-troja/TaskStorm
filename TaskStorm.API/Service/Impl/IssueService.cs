@@ -143,11 +143,6 @@ public class IssueService : IIssueService
         return issue;
     }
 
-    public Task<IEnumerable<Issue>> GetAllAsync()
-    {
-        l.LogDebug($"GetAllAsync is not implemented yet");
-        throw new NotImplementedException();
-    }
 
     public async Task<IssueDto> GetIssueDtoByIdAsync(int id)
     {
@@ -451,14 +446,15 @@ public class IssueService : IIssueService
     private async Task<Issue> GetIssueFromDb(int id)
     {
         l.LogDebug($"Fetching issue entity for issueId {id}");
-        Issue? issue = await _db.Issues
-                                  .Include(i => i.Key)
-                                  .Include(i => i.Author)
-                                  .Include(i => i.Assignee)
-                                  .Include(i => i.Project)
-                                    .Include(i => i.Comments).ThenInclude(c => c.Author)
-                                    .Include(i => i.Team)
-                                  .FirstOrDefaultAsync(i => i.Id == id);
+        var issue = await _db.Issues
+    .Include(i => i.Key)
+    .Include(i => i.Author)
+    .Include(i => i.Assignee)
+    .Include(i => i.Project)
+    .Include(i => i.Team).ThenInclude(t => t.Users)
+    .Include(i => i.Comments).ThenInclude(c => c.Author)
+    .Include(i => i.Comments).ThenInclude(c => c.Attachments)
+    .FirstOrDefaultAsync(i => i.Id == id);
         l.LogDebug($"Fetched issue: {issue}");
 
         return issue ?? throw new IssueNotFoundException("Issue " + id + " was not found");
@@ -474,6 +470,7 @@ public class IssueService : IIssueService
             .Include(i => i.Assignee)
             .Include(i => i.Project)
             .Include(i => i.Comments).ThenInclude(c => c.Author)
+            .Include(i => i.Comments).ThenInclude(c => c.Attachments)
             .Include(i => i.Team)
             .ToListAsync();
         return issues;
