@@ -39,9 +39,9 @@ public class TestController : ControllerBase
     [HttpGet("version")]
     public IActionResult GetVersion()
     {
-        var version = System.Reflection.Assembly
-            .GetExecutingAssembly()
-            .GetCustomAttribute<System.Reflection.AssemblyInformationalVersionAttribute>()?
+        var version = Assembly
+            .GetEntryAssembly()?
+            .GetCustomAttribute<AssemblyInformationalVersionAttribute>()?
             .InformationalVersion ?? "unknown";
 
         return Ok(new { version });

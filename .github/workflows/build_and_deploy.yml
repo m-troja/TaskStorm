@@ -23,7 +23,13 @@ jobs:
         id: gitversion
         uses: gittools/actions/gitversion/execute@v2
       - name: Build
-        run: dotnet build TaskStorm.API/TaskStorm.API.csproj --configuration Release /p:Version=${{ steps.gitversion.outputs.fullSemVer }}
+        run: |
+           dotnet build TaskStorm.API/TaskStorm.API.csproj \
+             --configuration Release \
+             /p:Version=${{ steps.gitversion.outputs.fullSemVer }} \
+             /p:AssemblyVersion=${{ steps.gitversion.outputs.majorMinorPatch }} \
+             /p:FileVersion=${{ steps.gitversion.outputs.majorMinorPatch }} \
+             /p:InformationalVersion=${{ steps.gitversion.outputs.fullSemVer }}      
       - name: Show build output
         run: ls -R TaskStorm.API/bin/Release/
       - name: Install SSH keys
