@@ -23,23 +23,23 @@ public class FileController : ControllerBase
 {
     private readonly ILogger<FileController> l;
     private readonly IFileService _fileService;
+
+
     [Authorize]
     [HttpPost]
+    [Consumes("multipart/form-data")]
     public async Task<ActionResult<AttachmentCreatedResponse>> Upload(
-        [FromForm] IFormFile file,
-        [FromForm] string commentId)
+        [FromForm] FileUploadRequest request)
     {
-        l.LogDebug($"FileController POST upload: {file?.FileName}");
-
-        if (file == null || file.Length == 0)
+        if (request.File == null || request.File.Length == 0)
             return BadRequest("Invalid file");
 
-        var id = await _fileService.SaveImageAsync(file, commentId);
+        var id = await _fileService.SaveImageAsync(request.File, request.CommentId);
 
         return Ok(new AttachmentCreatedResponse(
             ResponseType.FILE_UPLOADED_OK,
             id,
-            int.Parse(commentId)
+            int.Parse(request.CommentId)
         ));
     }
     [Authorize]

@@ -1,10 +1,12 @@
-﻿namespace TaskStorm.Model.Request;
+﻿using System.ComponentModel.DataAnnotations;
 
-public record FileUploadRequest // form
-    (
-    
-    IFormFile File,
-        string CommentId
-     )
+namespace TaskStorm.Model.Request;
+
+public class FileUploadRequest
 {
+    [Required]
+    public IFormFile File { get; set; }
+
+    [Required]
+    public string CommentId { get; set; }
 }
