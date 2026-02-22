@@ -46,7 +46,7 @@ jobs:
       - name: Restart app on server
         run: |
           ssh ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} \
-            "sudo systemctl restart task-system-api.service"
+            "sudo systemctl restart taskstorm-api.service"
 
       - name: Cleanup
         run: rm -rf ~/.ssh
