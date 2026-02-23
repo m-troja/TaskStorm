@@ -5,6 +5,8 @@ using TaskStorm.Model.DTO;
 using TaskStorm.Model.DTO.Cnv;
 using TaskStorm.Model.Entity;
 using TaskStorm.Service;
+using TaskStorm.Model.Request;
+
 
 namespace TaskStorm.Controller;
 
@@ -13,9 +15,9 @@ namespace TaskStorm.Controller;
 [Route("api/v1/user")]
 public class UserController : ControllerBase
 {
-    private readonly IUserService _us;
     private readonly UserCnv _userCnv;
     private readonly ILogger<UserController> _logger;
+    private readonly IUserService _us;
 
     public UserController(IUserService us, UserCnv userCnv, ILogger<UserController> logger)
     {
@@ -102,6 +104,17 @@ public class UserController : ControllerBase
         user.Disabled = dto.Disabled;
 
         await _us.UpdateUserAsync(user);
+
+        return Ok(_userCnv.ConvertUserToDto(user));
+    }
+
+    [Authorize(Roles = Role.ROLE_ADMIN)]
+    [HttpPut("role")]
+    public async Task<ActionResult<UserDto>> UpdateRole([FromBody] UpdateRoleRequest req)
+    {
+        _logger.LogInformation($"Triggered PUT api/v1/user/role: {req}", req);
+
+        var user = await _us.UpdateRole(req);
 
         return Ok(_userCnv.ConvertUserToDto(user));
     }
