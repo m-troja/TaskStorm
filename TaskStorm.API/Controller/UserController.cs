@@ -1,11 +1,12 @@
 ﻿using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using System.Security.Claims;
 using TaskStorm.Log;
 using TaskStorm.Model.DTO;
 using TaskStorm.Model.DTO.Cnv;
 using TaskStorm.Model.Entity;
-using TaskStorm.Service;
 using TaskStorm.Model.Request;
+using TaskStorm.Service;
 
 
 namespace TaskStorm.Controller;
@@ -115,6 +116,19 @@ public class UserController : ControllerBase
         _logger.LogInformation($"Triggered PUT api/v1/user/role: {req}", req);
 
         var user = await _us.UpdateRole(req);
+
+        return Ok(_userCnv.ConvertUserToDto(user));
+    }
+
+    [HttpPut("me/password")]
+    public async Task<ActionResult<UserDto>> ChangePassword([FromBody] ChangePasswordRequest req)
+    {
+        _logger.LogInformation($"Triggered PUT api/v1/user/me/password: {req}", req);
+
+        int userId = int.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
+        _logger.LogDebug($"Extracted userId from token: {userId}");
+
+        var user = await _us.ChangePassword(req, userId);
 
         return Ok(_userCnv.ConvertUserToDto(user));
     }

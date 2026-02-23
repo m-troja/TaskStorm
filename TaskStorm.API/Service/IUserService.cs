@@ -20,5 +20,6 @@ namespace TaskStorm.Service
         Task<User> GetUserByRefreshTokenAsync(string token);
         Task<User> ResetPassword(ResetPasswordRequest req);
         Task<User> UpdateRole(UpdateRoleRequest req);
+        Task<User> ChangePassword(ChangePasswordRequest req, int id);
     }
 }

@@ -28,7 +28,7 @@ public class AdminController : ControllerBase
     [HttpPut("password")]
     public async Task<ActionResult<UserDto>> ResetPassword([FromBody] ResetPasswordRequest req)
     {
-        _logger.LogInformation($"Triggered PUT api/v1/user/password for userId {req.id}");
+        _logger.LogInformation($"Triggered PUT api/v1/user/password for userId {req.userId}");
 
         var user = await _userService.ResetPassword(req);
 

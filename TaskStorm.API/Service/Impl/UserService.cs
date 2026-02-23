@@ -218,14 +218,15 @@ public class UserService : IUserService
         return refreshToken.User!;
     }
 
+    // for admin use only, no need to verify current password
     public async Task<User> ResetPassword(ResetPasswordRequest req)
     {
-        l.LogDebug($"Resetting password for user with id: {req.id}");
-        User? user = await _db.Users.FirstOrDefaultAsync(u => u.Id == req.id);
+        l.LogDebug($"Resetting password for user with id: {req.userId}");
+        User? user = await _db.Users.FirstOrDefaultAsync(u => u.Id == req.userId);
         if (user == null)
         {
-            l.LogDebug($"User with id '{req.id}' not found");
-            throw new UserNotFoundException("User by email '" + req.id + "' was not found");
+            l.LogDebug($"User with id '{req.userId}' not found");
+            throw new UserNotFoundException("User by email '" + req.userId + "' was not found");
         }
         byte[] salt = _passwordService.GenerateSalt();
         string hashedPassword = _passwordService.HashPassword(req.NewPassword, salt);
@@ -233,7 +234,7 @@ public class UserService : IUserService
         user.Salt = salt;
         _db.Users.Update(user);
         await _db.SaveChangesAsync();
-        l.LogDebug($"Password reset successfully for user with email: {req.id}");
+        l.LogDebug($"Password reset successfully for user with email: {req.userId}");
         return user;
     }
     public async Task<User> UpdateRole(UpdateRoleRequest req)
@@ -271,5 +272,29 @@ public class UserService : IUserService
         l.LogDebug($"Roles updated successfully for user with id: {req.userId}");
         return user;
     }
+    public async Task<User> ChangePassword(ChangePasswordRequest req, int id)
+    {
+        l.LogDebug($"Changing password for user with id: {id}");
+        User? user = await _db.Users.FirstOrDefaultAsync(u => u.Id == id);
+        if (user == null || user.Password == null || user.Salt == null)
+        {
+            l.LogDebug($"User with id '{id}' not found");
+            throw new UserNotFoundException("User by email '" + id + "' was not found");
+        }
+        if ( ! await _passwordService.Verify(
+            req.CurrentPassword, user.Password, user.Salt))
+        {
+            throw new BadRequestException("Password verification failed");
+        }
+        byte[] salt = _passwordService.GenerateSalt();
+        string hashedNewPassword = _passwordService.HashPassword(req.NewPassword, salt);
+        user.Password = hashedNewPassword;
+        user.Salt = salt;
+        _db.Users.Update(user);
+        await _db.SaveChangesAsync();
+        l.LogDebug($"Password changed successfully for user with id: {id}");
+        return user;
+    }
+
 
 }

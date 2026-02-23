@@ -1,7 +1,7 @@
 ﻿namespace TaskStorm.Model.Request;
 
-public record ResetPasswordRequest(
-    int userId,
+public record ChangePasswordRequest(
+    string CurrentPassword,
     string NewPassword
 )
 {}

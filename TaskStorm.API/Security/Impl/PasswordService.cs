@@ -29,6 +29,19 @@ public class PasswordService : IPasswordService
         return salt;
     }
 
+    public async Task<Boolean> Verify(string password, string hashedPassword, byte[] salt)
+    {
+        l.LogDebug($"Verifying password. Input password: {password}, Hashed password: {hashedPassword}, Salt: {Convert.ToBase64String(salt)}");
+        string hashedInput = HashPassword(password, salt);
+        l.LogDebug($"Hashed input password: {hashedInput}");
+        if (hashedInput != hashedPassword)
+        {
+            l.LogWarning("Password verification failed");
+            throw new UnauthorizedAccessException("Invalid password");
+        }
+        l.LogDebug("Password verification succeeded");
+        return true;
+    }
     public PasswordService(ILogger<PasswordService> logger)
     {
         l = logger;
