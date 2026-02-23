@@ -1,7 +1,7 @@
 ﻿using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Logging;
 using Moq;
-using System;
+using System.Collections.Generic;
 using System.Threading.Tasks;
 using TaskStorm.Controller;
 using TaskStorm.Model.DTO;
@@ -15,111 +15,83 @@ using Xunit;
 
 namespace TaskStorm.Tests.Controller;
 
-public class RegisterControllerTest
+public class RegisterControllerTests
 {
-    private RegisterController CreateController(
-        Mock<IRegisterService> rsMock)
+    private readonly Mock<IRegisterService> _registerServiceMock;
+    private readonly ILogger<RegisterController> _logger;
+    private readonly UserCnv _userCnv;
+
+    public RegisterControllerTests()
     {
-        var logger = new LoggerFactory().CreateLogger<RegisterController>();
-        var userCnv = new UserCnv();
-        return new RegisterController(rsMock.Object, logger, userCnv);
+        _registerServiceMock = new Mock<IRegisterService>();
+        _logger = new LoggerFactory().CreateLogger<RegisterController>();
+        _userCnv = new UserCnv();
     }
 
-    // 1) SUCCESSFUL REGISTRATION
+    private RegisterController CreateController() =>
+        new RegisterController(_registerServiceMock.Object, _logger, _userCnv);
+
     [Fact]
     public async Task RegisterUser_ShouldReturnOk_WhenRegistrationSucceeds()
     {
-        // arrange
-        var rsMock = new Mock<IRegisterService>();
-        var user = new User("Jan", "Kowalski", "test@example.com", "hashed", new byte[] { 1 }, new Role(Role.ROLE_USER));
-        var req = new RegistrationRequest("Jan", "Kowalski", "test@example.com", "hashed", "U123456");
-        rsMock.Setup(s => s.Register(req)).ReturnsAsync(user);
+        var controller = CreateController();
+        var req = new RegistrationRequest("John", "Doe", "test@example.com", "hashed", "U123");
 
-        var controller = CreateController(rsMock);
+        var user = new User("John", "Doe", "test@example.com", "hashed", new byte[] { 1 }, new Role(Role.ROLE_USER));
+        _registerServiceMock.Setup(s => s.Register(req)).ReturnsAsync(user);
 
-
-        // act
         var result = await controller.RegisterUser(req);
 
-        // assert
-        var ok = Assert.IsType<OkObjectResult>(result.Result);
-        var dto = Assert.IsType<UserDto>(ok.Value);
+        var okResult = Assert.IsType<OkObjectResult>(result.Result);
+        var dto = Assert.IsType<UserDto>(okResult.Value);
 
-        Assert.Equal("Jan", dto.FirstName);
-        Assert.Equal("Kowalski", dto.LastName);
+        Assert.Equal("John", dto.FirstName);
+        Assert.Equal("Doe", dto.LastName);
         Assert.Equal("test@example.com", dto.Email);
 
-        rsMock.Verify(s => s.Register(req), Times.Once);
+        _registerServiceMock.Verify(s => s.Register(req), Times.Once);
     }
 
-    // 2) USER ALREADY EXISTS -> Conflict
-    [Fact]
-    public async Task RegisterUser_ShouldReturnConflict_WhenUserAlreadyExists()
-    {
-        // arrange
-        var rsMock = new Mock<IRegisterService>();
-        rsMock.Setup(s => s.Register(It.IsAny<RegistrationRequest>()))
-              .ThrowsAsync(new UserAlreadyExistsException("Email already registered"));
-
-        var controller = CreateController(rsMock);
-        var req = new RegistrationRequest("Jan", "Kowalski", "test@example.com", "hashed", "U123456");
-
-        // act
-        var result = await controller.RegisterUser(req);
-
-        // assert
-        var conflict = Assert.IsType<ConflictObjectResult>(result.Result);
-        Assert.Contains("Email already registered", conflict.Value.ToString());
-    }
-
-    // 3) INVALID REGISTRATION -> BadRequest
-    [Fact]
-    public async Task RegisterUser_ShouldReturnBadRequest_WhenInvalidData()
-    {
-        // arrange
-        var rsMock = new Mock<IRegisterService>();
-        var req = new RegistrationRequest("", "", "", "", "");
-        rsMock.Setup(s => s.Register(req))
-              .ThrowsAsync(new RegisterEmailException("Missing required fields"));
-
-        var controller = CreateController(rsMock);
-
-        // act
-        var result = await controller.RegisterUser(req);
-
-        // assert
-        var badRequest = Assert.IsType<BadRequestObjectResult>(result.Result);
-        Assert.Contains("Missing required fields", badRequest.Value.ToString());
-    }
-
-    // 4) NULL REQUEST -> BadRequest
     [Fact]
     public async Task RegisterUser_ShouldReturnBadRequest_WhenRequestIsNull()
     {
-        // arrange
-        var rsMock = new Mock<IRegisterService>();
-        var controller = CreateController(rsMock);
+        var controller = CreateController();
 
-        // act
         var result = await controller.RegisterUser(null!);
 
-        // assert
-        var badRequest = Assert.IsType<BadRequestObjectResult>(result.Result);
-        Assert.Contains("Request cannot be null", badRequest.Value.ToString());
+        var badResult = Assert.IsType<BadRequestObjectResult>(result.Result);
+        Assert.Equal("Request cannot be null", badResult.Value);
 
-        rsMock.Verify(s => s.Register(It.IsAny<RegistrationRequest>()), Times.Never);
+        _registerServiceMock.Verify(s => s.Register(It.IsAny<RegistrationRequest>()), Times.Never);
     }
-    private UserDto BuildUserDto(string slackUserId)
+
+    [Fact]
+    public async Task RegisterUser_ShouldReturnBadRequest_WhenEmailInvalid()
     {
-        return new UserDto(
-            1,
-            "John",
-            "Doe",
-            "email@test.com",
-            new List<string>() { Role.ROLE_USER },
-            new List<string>() { },
-            false,
-            slackUserId
-            );
+        var controller = CreateController();
+        var req = new RegistrationRequest("John", "Doe", "invalid", "hashed", "U123");
+
+        _registerServiceMock.Setup(s => s.Register(req))
+            .ThrowsAsync(new RegisterEmailException("Invalid email"));
+
+        var result = await controller.RegisterUser(req);
+
+        var badResult = Assert.IsType<BadRequestObjectResult>(result.Result);
+        Assert.Contains("Invalid email", badResult.Value.ToString());
     }
-} 
+
+    [Fact]
+    public async Task RegisterUser_ShouldReturnConflict_WhenUserAlreadyExists()
+    {
+        var controller = CreateController();
+        var req = new RegistrationRequest("John", "Doe", "test@example.com", "hashed", "U123");
+
+        _registerServiceMock.Setup(s => s.Register(req))
+            .ThrowsAsync(new UserAlreadyExistsException("User exists"));
+
+        var result = await controller.RegisterUser(req);
+
+        var conflictResult = Assert.IsType<ConflictObjectResult>(result.Result);
+        Assert.Contains("User exists", conflictResult.Value.ToString());
+    }
+}

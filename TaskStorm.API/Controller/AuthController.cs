@@ -25,11 +25,31 @@ public class AuthController : ControllerBase
     [HttpPost("regenerate-tokens")]
     public async Task<ActionResult<TokenResponseDto>> RegenerateTokensByRefreshToken([FromBody] RefreshTokenRequest req)
     {
-        l.LogInformation($"POST api/v1/auth/regenerate-tokens: {req.RefreshToken}");
-        var tokenDto = await _authService.RegenerateTokensByRefreshToken(req.RefreshToken);
-        l.LogDebug($"Tokens regenerated successfully by refreshToken={req.RefreshToken}, new token= {tokenDto.RefreshToken}");  
+        if (req == null || string.IsNullOrWhiteSpace(req.RefreshToken))
+            return BadRequest("Refresh token is required");
 
-        return Ok(tokenDto);
+        try
+        {
+            l.LogInformation($"POST api/v1/auth/regenerate-tokens");
+            var tokenDto = await _authService.RegenerateTokensByRefreshToken(req.RefreshToken);
+            l.LogDebug($"Tokens regenerated successfully by refreshToken={req.RefreshToken}, new token= {tokenDto.RefreshToken}");
+            return Ok(tokenDto);
+        }
+        catch (InvalidRefreshTokenException ex)
+        {
+            l.LogWarning($"Invalid refresh token: {ex.Message}");
+            return Unauthorized(ex.Message);
+        }
+        catch (TokenExpiredException ex)
+        {
+            l.LogWarning($"Expired refresh token: {ex.Message}");
+            return Unauthorized(ex.Message);
+        }
+        catch (TokenRevokedException ex)
+        {
+            l.LogWarning($"Revoked refresh token: {ex.Message}");
+            return Unauthorized(ex.Message);
+        }
     }
 
     public AuthController(ILogger<AuthController> l, IAuthService authService)

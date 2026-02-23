@@ -1,169 +1,228 @@
 ﻿using Microsoft.EntityFrameworkCore;
-using Microsoft.EntityFrameworkCore.Diagnostics;
 using Microsoft.Extensions.Logging;
 using Moq;
 using System;
 using System.Collections.Generic;
-using System.Linq;
-using System.Text;
 using System.Threading.Tasks;
 using TaskStorm.Data;
 using TaskStorm.Exception.Tokens;
+using TaskStorm.Exception.UserException;
 using TaskStorm.Model.DTO.Cnv;
 using TaskStorm.Model.Entity;
-using TaskStorm.Model.Request;
 using TaskStorm.Security;
 using TaskStorm.Service;
 using TaskStorm.Service.Impl;
 using Xunit;
 
 namespace TaskStorm.Tests.Service;
+
 public class AuthServiceTest
 {
+    // --- Header mocks ---
+    private readonly Mock<IJwtGenerator> _jwtMock;
+    private readonly ILogger<AuthService> _logger;
+    private readonly RefreshTokenCnv _refreshTokenCnv;
+
+    public AuthServiceTest()
+    {
+        _jwtMock = new Mock<IJwtGenerator>();
+        _logger = new LoggerFactory().CreateLogger<AuthService>();
+        _refreshTokenCnv = new RefreshTokenCnv();
+    }
+
+    // --- Helper: in-memory DB ---
     private static PostgresqlDbContext GetDb()
     {
         var options = new DbContextOptionsBuilder<PostgresqlDbContext>()
-            .UseInMemoryDatabase(databaseName: Guid.NewGuid().ToString())
+            .UseInMemoryDatabase(Guid.NewGuid().ToString())
             .Options;
-        var db = new PostgresqlDbContext(options);
-
-        db.Users.RemoveRange(db.Users);
-        db.SaveChanges();
 
         return new PostgresqlDbContext(options);
     }
-    private ILogger<AuthService> Log()
+
+    // --- Helper: create service ---
+    private AuthService CreateService(PostgresqlDbContext db)
     {
-        return new LoggerFactory().CreateLogger<AuthService>();
+        return new AuthService(db, _logger, _jwtMock.Object, _refreshTokenCnv);
     }
 
-    private AuthService CreateService(
-        PostgresqlDbContext db,
-        Mock<IUserService> mu,
-        Mock<IJwtGenerator> mjwt)
+    // --- Helper: seed full user ---
+    private static User SeedUser(PostgresqlDbContext db, int id = 1)
     {
-        var refreshTokenCnv = new RefreshTokenCnv();
-        return new AuthService(db, Log(), mjwt.Object, refreshTokenCnv);
+        var user = new User
+        {
+            Id = id,
+            FirstName = "John",
+            LastName = "Doe",
+            Email = "test@test.com",
+            Password = "hashed",
+            Salt = new byte[] { 1, 2, 3 },
+            Roles = new List<Role> { new Role(Role.ROLE_USER) },
+            RefreshTokens = new List<RefreshToken>()
+        };
+
+        db.Users.Add(user);
+        db.SaveChanges();
+
+        return user;
     }
+
+    // --- Tests ---
 
     [Fact]
-    public void GetAccessTokenByUserId_ShouldReturnAccessToken()
+    public void GetAccessTokenByUserId_ShouldGenerateToken()
     {
-        // given
-        int userId = 1;
-        var mjwt = new Mock<IJwtGenerator>();
-        var mu = new Mock<IUserService>();
-        var accessToken = new AccessToken("new-access-token", DateTime.UtcNow.AddMinutes(2));
-
-        mjwt.Setup(x => x.GenerateAccessToken(userId)).Returns(accessToken);
-        var service = CreateService(GetDb(), mu, mjwt);
-
-        // when
-        var token = service.GetAccessTokenByUserId(userId);
-
-        // then
-        Assert.Equal("new-access-token", token.Token);
-    }
-
-    [Fact]
-    public async void ValidateRefreshTokenRequest_ShouldReturnTrue()
-    {
-        // given
         var db = GetDb();
-        var user1 = new User("test", "U123") { Email = "a@a.com", Id = 1 };
-        var user2 = new User("test2", "U1234") { Email = "b@a.com", Id = 2 };
-        var mjwt = new Mock<IJwtGenerator>();
-        var mu = new Mock<IUserService>();
-        var service = CreateService(db, mu, mjwt);
-        var req = new RefreshTokenRequest("token");
+        var service = CreateService(db);
 
-        // db 
-        db.Users.Add(user1);
-        db.Users.Add(user2);
-        await db.SaveChangesAsync();
+        _jwtMock.Setup(x => x.GenerateAccessToken(1))
+                .Returns(new AccessToken("access", DateTime.UtcNow.AddMinutes(5)));
 
-        var tokenForUser1 = new RefreshToken(req.RefreshToken, 1, DateTime.UtcNow.AddDays(2));
-        db.RefreshTokens.Add(tokenForUser1);
-        await db.SaveChangesAsync();
+        var token = service.GetAccessTokenByUserId(1);
 
-        // when
-        var result = await service.ValidateRefreshTokenRequest(req.RefreshToken);
-
-        // then
-        Assert.True(result);
+        Assert.Equal("access", token.Token);
+        _jwtMock.Verify(x => x.GenerateAccessToken(1), Times.Once);
     }
 
     [Fact]
-    public async void ValidateRefreshTokenRequest_ShouldThrowInvalidRefreshTokenException()
+    public async Task GetAccessTokenByRefreshToken_ShouldReturnAccessToken()
     {
-        // given
         var db = GetDb();
-        var user1 = new User("test", "U123") { Email = "a@a.com", Id = 1 };
-        var user2 = new User("test2", "U1234") { Email = "b@a.com", Id = 2 };
-        var mjwt = new Mock<IJwtGenerator>();
-        var mu = new Mock<IUserService>();
-        var service = CreateService(db, mu, mjwt);
-        var req = new RefreshTokenRequest("token");
+        var user = SeedUser(db);
 
-        // db 
-        db.Users.Add(user1);
-        db.Users.Add(user2);
-        await db.SaveChangesAsync();
+        var refresh = new RefreshToken
+        {
+            Token = "refresh-123",
+            UserId = user.Id,
+            Expires = DateTime.UtcNow.AddMinutes(10)
+        };
 
-        // test invalid user id
-        await Assert.ThrowsAsync<InvalidRefreshTokenException>( () => 
-            service.ValidateRefreshTokenRequest("token"));
+        user.RefreshTokens.Add(refresh);
+        db.SaveChanges();
+
+        _jwtMock.Setup(x => x.GenerateAccessToken(user.Id))
+                .Returns(new AccessToken("access", DateTime.UtcNow.AddMinutes(5)));
+
+        var service = CreateService(db);
+
+        var token = await service.GetAccessTokenByRefreshToken("refresh-123");
+
+        Assert.Equal("access", token.Token);
     }
 
     [Fact]
-    public async void ValidateRefreshTokenRequest_ShouldThrowTokenRevokedException()
+    public async Task GetAccessTokenByRefreshToken_ShouldThrow_WhenUserNotFound()
     {
-        // given
+        var service = CreateService(GetDb());
+
+        await Assert.ThrowsAsync<UserNotFoundException>(() =>
+            service.GetAccessTokenByRefreshToken("invalid"));
+    }
+
+    [Fact]
+    public async Task GenerateRefreshToken_ShouldPersistToken()
+    {
         var db = GetDb();
-        var user1 = new User("test", "U123") { Email = "a@a.com", Id = 1 };
-        var user2 = new User("test2", "U1234") { Email = "b@a.com", Id = 2 };
-        var mjwt = new Mock<IJwtGenerator>();
-        var mu = new Mock<IUserService>();
-        var service = CreateService(db, mu, mjwt);
-        var req = new RefreshTokenRequest("token");
+        var user = SeedUser(db);
 
-        // db 
-        db.Users.Add(user1);
-        db.Users.Add(user2);
-        await db.SaveChangesAsync();
+        var refresh = new RefreshToken
+        {
+            Token = "new-refresh",
+            UserId = user.Id,
+            Expires = DateTime.UtcNow.AddMinutes(30)
+        };
 
-        var tokenForUser1 = new RefreshToken(req.RefreshToken, 1, DateTime.UtcNow.AddDays(2)) { IsRevoked = true}  ;
-        db.RefreshTokens.Add(tokenForUser1);
-        await db.SaveChangesAsync();
+        _jwtMock.Setup(x => x.GenerateRefreshToken(user.Id))
+                .Returns(refresh);
 
-        // test invalid user id
+        var service = CreateService(db);
+
+        var result = await service.GenerateRefreshToken(user.Id);
+
+        Assert.Equal("new-refresh", result.Token);
+        Assert.Single(db.RefreshTokens);
+    }
+
+    [Fact]
+    public async Task GenerateRefreshToken_ShouldThrow_WhenUserNotFound()
+    {
+        var service = CreateService(GetDb());
+
+        await Assert.ThrowsAsync<UserNotFoundException>(() =>
+            service.GenerateRefreshToken(999));
+    }
+
+    [Fact]
+    public async Task RegenerateTokens_ShouldRevokeOldAndCreateNew()
+    {
+        var db = GetDb();
+        var user = SeedUser(db);
+
+        var oldToken = new RefreshToken
+        {
+            Token = "old",
+            UserId = user.Id,
+            Expires = DateTime.UtcNow.AddMinutes(10),
+            IsRevoked = false
+        };
+
+        db.RefreshTokens.Add(oldToken);
+        user.RefreshTokens.Add(oldToken);
+        db.SaveChanges();
+
+        _jwtMock.Setup(x => x.GenerateRefreshToken(user.Id))
+                .Returns(new RefreshToken { Token = "new", UserId = user.Id, Expires = DateTime.UtcNow.AddMinutes(30) });
+
+        _jwtMock.Setup(x => x.GenerateAccessToken(user.Id))
+                .Returns(new AccessToken("access", DateTime.UtcNow.AddMinutes(5)));
+
+        var service = CreateService(db);
+
+        var response = await service.RegenerateTokensByRefreshToken("old");
+
+        Assert.True(oldToken.IsRevoked);
+        Assert.Equal("new", response.RefreshToken.Token);
+        Assert.Equal("access", response.AccessToken.Token);
+    }
+
+    [Fact]
+    public async Task RegenerateTokens_ShouldThrow_WhenTokenRevoked()
+    {
+        var db = GetDb();
+        var user = SeedUser(db);
+
+        db.RefreshTokens.Add(new RefreshToken
+        {
+            Token = "revoked",
+            UserId = user.Id,
+            IsRevoked = true,
+            Expires = DateTime.UtcNow.AddMinutes(10)
+        });
+        db.SaveChanges();
+
+        var service = CreateService(db);
+
         await Assert.ThrowsAsync<TokenRevokedException>(() =>
-            service.ValidateRefreshTokenRequest(req.RefreshToken));
+            service.RegenerateTokensByRefreshToken("revoked"));
     }
 
     [Fact]
-    public async void ValidateRefreshTokenRequest_ShouldThrowTokenExpiredException()
+    public async Task RegenerateTokens_ShouldThrow_WhenTokenExpired()
     {
-        // given
         var db = GetDb();
-        var user1 = new User("test", "U123") { Email = "a@a.com", Id = 1 };
-        var user2 = new User("test2", "U1234") { Email = "b@a.com", Id = 2 };
-        var mjwt = new Mock<IJwtGenerator>();
-        var mu = new Mock<IUserService>();
-        var service = CreateService(db, mu, mjwt);
-        var req = new RefreshTokenRequest("token");
+        var user = SeedUser(db);
 
-        // db 
-        db.Users.Add(user1);
-        db.Users.Add(user2);
-        await db.SaveChangesAsync();
+        db.RefreshTokens.Add(new RefreshToken
+        {
+            Token = "expired",
+            UserId = user.Id,
+            Expires = DateTime.UtcNow.AddMinutes(-1)
+        });
+        db.SaveChanges();
 
-        var tokenForUser1 = new RefreshToken(req.RefreshToken, 1, DateTime.Parse("2025-10-10"));
-        db.RefreshTokens.Add(tokenForUser1);
-        await db.SaveChangesAsync();
+        var service = CreateService(db);
 
-        // test invalid user id
         await Assert.ThrowsAsync<TokenExpiredException>(() =>
-            service.ValidateRefreshTokenRequest(req.RefreshToken));
+            service.RegenerateTokensByRefreshToken("expired"));
     }
 }

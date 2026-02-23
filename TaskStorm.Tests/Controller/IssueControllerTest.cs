@@ -286,7 +286,7 @@ public class IssueControllerTest
         var mi = new Mock<IIssueService>();
         var controller = CreateController(mi);
 
-        mi.Setup(s => s.deleteIssueById(1)).Returns(Task.CompletedTask);
+        mi.Setup(s => s.DeleteIssueByIdAsync(1)).Returns(Task.CompletedTask);
 
         var result = await controller.DeletelIssueById(1);
 

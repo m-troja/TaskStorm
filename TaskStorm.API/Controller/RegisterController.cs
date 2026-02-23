@@ -7,7 +7,6 @@ using TaskStorm.Service;
 using TaskStorm.Exception.Registration;
 using TaskStorm.Exception.UserException;
 using TaskStorm.Log;
-using TaskStorm.Exception.Tokens;
 
 namespace TaskStorm.Controller;
 
@@ -29,13 +28,14 @@ public class RegisterController : ControllerBase
     [HttpPost]
     public async Task<ActionResult<UserDto>> RegisterUser([FromBody] RegistrationRequest req)
     {
-        _logger.LogInformation("Received RegisterUser req: FirstName={} LastName={} email={} SlackUserId={}", req.FirstName, req.LastName, req.Email, req.SlackUserId);
-        
         if (req == null)
         {
-            _logger.LogError("req == null -> throwing BadRequest");
+            _logger.LogError("RegisterUser: Request is null");
             return BadRequest("Request cannot be null");
         }
+
+        _logger.LogInformation("Received RegisterUser req: FirstName={FirstName} LastName={LastName} Email={Email} SlackUserId={SlackUserId}",
+            req.FirstName, req.LastName, req.Email, req.SlackUserId);
 
         try
         {
@@ -45,7 +45,7 @@ public class RegisterController : ControllerBase
         }
         catch (RegisterEmailException ex)
         {
-            _logger.LogWarning(ex, "Registration failed due to invalid email address");
+            _logger.LogWarning(ex, "Registration failed due to invalid email");
             return BadRequest(new { Message = ex.Message });
         }
         catch (UserAlreadyExistsException ex)
