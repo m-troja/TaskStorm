@@ -1,5 +1,6 @@
 ﻿using TaskStorm.Model.DTO;
 using TaskStorm.Model.Entity;
+using TaskStorm.Model.Request;
 
 namespace TaskStorm.Service
 {
@@ -17,5 +18,7 @@ namespace TaskStorm.Service
         Task DeleteUserById(int id);
         Task<bool> SaveRefreshTokenAsync(RefreshToken refreshToken);
         Task<User> GetUserByRefreshTokenAsync(string token);
+        Task<User> ResetPassword(ResetPasswordRequest req);
+        Task<User> UpdateRole(UpdateRoleRequest req);
     }
 }

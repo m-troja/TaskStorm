@@ -5,6 +5,8 @@ using TaskStorm.Model.DTO;
 using TaskStorm.Model.DTO.Cnv;
 using TaskStorm.Model.Entity;
 using TaskStorm.Service;
+using TaskStorm.Model.Request;
+
 
 namespace TaskStorm.Controller;
 
@@ -102,6 +104,27 @@ public class UserController : ControllerBase
         user.Disabled = dto.Disabled;
 
         await _us.UpdateUserAsync(user);
+
+        return Ok(_userCnv.ConvertUserToDto(user));
+    }
+
+    [HttpPut("password")]
+    public async Task<ActionResult<UserDto>> ResetPassword([FromBody] ResetPasswordRequest req)
+    {
+        _logger.LogInformation($"Triggered PUT api/v1/user/password for userId {req.id}");
+
+        var user = await _us.ResetPassword(req);
+
+        return Ok(_userCnv.ConvertUserToDto(user));
+    }
+
+    [Authorize(Roles = Role.ROLE_ADMIN)]
+    [HttpPut("role")]
+    public async Task<ActionResult<UserDto>> UpdateRole([FromBody] UpdateRoleRequest req)
+    {
+        _logger.LogInformation($"Triggered PUT api/v1/user/role: {req}", req);
+
+        var user = await _us.UpdateRole(req);
 
         return Ok(_userCnv.ConvertUserToDto(user));
     }
