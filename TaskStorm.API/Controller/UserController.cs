@@ -123,7 +123,7 @@ public class UserController : ControllerBase
     [HttpPut("me/password")]
     public async Task<ActionResult<UserDto>> ChangePassword([FromBody] ChangePasswordRequest req)
     {
-        _logger.LogInformation($"Triggered PUT api/v1/user/me/password: {req}", req);
+        _logger.LogInformation($"Triggered PUT api/v1/user/me/password: {req}");
 
         int userId = int.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
         _logger.LogDebug($"Extracted userId from token: {userId}");
