@@ -119,6 +119,8 @@ public class CommentControllerTest
 
     private CommentDto GetCommentDto(int id)
     {
-        return new CommentDto(id, 1, "content" + " " + id.ToString(), 1, DateTime.Parse("2026-02-01"), DateTime.Parse("2026-02-01"), "FirstName LastName");
+        var attachmentIds = new List<int> { 1, 2, 3 };
+        return new CommentDto(id, 1, "content" + " " + id.ToString(), 1, DateTime.Parse("2026-02-01"), DateTime.Parse("2026-02-01"), "FirstName LastName",
+            attachmentIds, "U123");
     }
 }

@@ -8,6 +8,9 @@ using TaskStorm.Model.DTO;
 using TaskStorm.Model.DTO.Cnv;
 using System.ComponentModel;
 using TaskStorm.Exception.Tokens;
+using TaskStorm.Security;
+using TaskStorm.Model.Request;
+using TaskStorm.Exception;
 
 namespace TaskStorm.Service.Impl;
 
@@ -18,13 +21,17 @@ public class UserService : IUserService
     private readonly ILogger<UserService> l;
     private readonly UserCnv _userCnv;
     private readonly IChatGptService _chatGptService;
+    private readonly IPasswordService _passwordService;
 
-    public UserService(PostgresqlDbContext db, ILogger<UserService> logger, UserCnv userCnv, IChatGptService _chatGptService)
+    public UserService(PostgresqlDbContext db, ILogger<UserService> logger, UserCnv userCnv, IChatGptService _chatGptService,
+        IPasswordService _passwordService
+        )
     {
         _db = db;
         l = logger;
         _userCnv = userCnv;
         this._chatGptService = _chatGptService;
+        this._passwordService = _passwordService;
     }
     public async Task<User> GetByIdAsync(int id)
     {
@@ -210,4 +217,84 @@ public class UserService : IUserService
         l.LogDebug($"User fetched: {refreshToken.User}");
         return refreshToken.User!;
     }
+
+    // for admin use only, no need to verify current password
+    public async Task<User> ResetPassword(ResetPasswordRequest req)
+    {
+        l.LogDebug($"Resetting password for user with id: {req.userId}");
+        User? user = await _db.Users.FirstOrDefaultAsync(u => u.Id == req.userId);
+        if (user == null)
+        {
+            l.LogDebug($"User with id '{req.userId}' not found");
+            throw new UserNotFoundException("User by email '" + req.userId + "' was not found");
+        }
+        byte[] salt = _passwordService.GenerateSalt();
+        string hashedPassword = _passwordService.HashPassword(req.NewPassword, salt);
+        user.Password = hashedPassword;
+        user.Salt = salt;
+        _db.Users.Update(user);
+        await _db.SaveChangesAsync();
+        l.LogDebug($"Password reset successfully for user with email: {req.userId}");
+        return user;
+    }
+    public async Task<User> UpdateRole(UpdateRoleRequest req)
+    {
+        l.LogDebug($"Updating role for user with id: {req.userId}, addRoleId: {req.addRoleId}, removeRoleId: {req.removeRoleId}");
+        User? user = await _db.Users.Include(u => u.Roles).FirstOrDefaultAsync(u => u.Id == req.userId);
+        if (user == null)
+        {
+            l.LogDebug($"User with id '{req.userId}' not found");
+            throw new UserNotFoundException("User by email '" + req.userId + "' was not found");
+        }
+        var addRole = await _db.Roles.FirstOrDefaultAsync(r => r.Id == req.addRoleId);
+        var removeRole = await _db.Roles.FirstOrDefaultAsync(r => r.Id == req.removeRoleId);
+        if (addRole != null && !user.Roles.Any(r => r.Id == addRole.Id))
+        {
+            user.Roles.Add(addRole);
+            l.LogDebug($"Added role '{addRole.Name}' to user with id: {req.userId}");
+        }
+        if (removeRole != null && user.Roles.Any(r => r.Id == removeRole.Id))
+        {
+            if (removeRole.Name == Role.ROLE_ADMIN)
+            {
+                int adminCount = await _db.Users.CountAsync(u => u.Roles.Any(r => r.Name == Role.ROLE_ADMIN) && u.Id != user.Id);
+                if (adminCount == 0)
+                {
+                    l.LogDebug($"Cannot remove role '{removeRole.Name}' from user with id: {req.userId} because they are the last admin");
+                    throw new BadRequestException("Cannot remove the last admin role from the system");
+                }
+            }
+            user.Roles.Remove(removeRole);
+            l.LogDebug($"Removed role '{removeRole.Name}' from user with id: {req.userId}");
+        }
+        _db.Users.Update(user);
+        await _db.SaveChangesAsync();
+        l.LogDebug($"Roles updated successfully for user with id: {req.userId}");
+        return user;
+    }
+    public async Task<User> ChangePassword(ChangePasswordRequest req, int id)
+    {
+        l.LogDebug($"Changing password for user with id: {id}");
+        User? user = await _db.Users.FirstOrDefaultAsync(u => u.Id == id);
+        if (user == null || user.Password == null || user.Salt == null)
+        {
+            l.LogDebug($"User with id '{id}' not found");
+            throw new UserNotFoundException("User by email '" + id + "' was not found");
+        }
+        if ( ! await _passwordService.Verify(
+            req.CurrentPassword, user.Password, user.Salt))
+        {
+            throw new BadRequestException("Password verification failed");
+        }
+        byte[] salt = _passwordService.GenerateSalt();
+        string hashedNewPassword = _passwordService.HashPassword(req.NewPassword, salt);
+        user.Password = hashedNewPassword;
+        user.Salt = salt;
+        _db.Users.Update(user);
+        await _db.SaveChangesAsync();
+        l.LogDebug($"Password changed successfully for user with id: {id}");
+        return user;
+    }
+
+
 }

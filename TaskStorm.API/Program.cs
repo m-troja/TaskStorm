@@ -6,6 +6,8 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.FileProviders;
 using Microsoft.IdentityModel.Tokens;
 using Serilog;
+using System.IdentityModel.Tokens.Jwt;
+using System.Security.Claims;
 using System.Text;
 using System.Text.Json.Serialization;
 using TaskStorm.Data;
@@ -87,7 +89,8 @@ try
     var jwtAudience = Environment.GetEnvironmentVariable("JWT_AUDIENCE")
         ?? throw new InvalidOperationException("JWT audience not configured.");
 
-    // Authentication
+    JwtSecurityTokenHandler.DefaultInboundClaimTypeMap.Clear();
+
     builder.Services.AddAuthentication(options =>
     {
         options.DefaultAuthenticateScheme = JwtBearerDefaults.AuthenticationScheme;
@@ -96,6 +99,7 @@ try
     .AddJwtBearer(options =>
     {
         var key = Encoding.UTF8.GetBytes(jwtSecret);
+
         options.TokenValidationParameters = new TokenValidationParameters
         {
             ValidateIssuer = true,
@@ -108,8 +112,12 @@ try
             ClockSkew = TimeSpan.FromMinutes(1),
 
             ValidateIssuerSigningKey = true,
-            IssuerSigningKey = new SymmetricSecurityKey(key)
+            IssuerSigningKey = new SymmetricSecurityKey(key),
+
+            NameClaimType = ClaimTypes.NameIdentifier,
+            RoleClaimType = ClaimTypes.Role
         };
+
     });
 
     builder.Services.AddAuthorization();

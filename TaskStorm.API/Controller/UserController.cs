@@ -1,10 +1,13 @@
 ﻿using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using System.Security.Claims;
 using TaskStorm.Log;
 using TaskStorm.Model.DTO;
 using TaskStorm.Model.DTO.Cnv;
 using TaskStorm.Model.Entity;
+using TaskStorm.Model.Request;
 using TaskStorm.Service;
+
 
 namespace TaskStorm.Controller;
 
@@ -13,9 +16,9 @@ namespace TaskStorm.Controller;
 [Route("api/v1/user")]
 public class UserController : ControllerBase
 {
-    private readonly IUserService _us;
     private readonly UserCnv _userCnv;
     private readonly ILogger<UserController> _logger;
+    private readonly IUserService _us;
 
     public UserController(IUserService us, UserCnv userCnv, ILogger<UserController> logger)
     {
@@ -102,6 +105,30 @@ public class UserController : ControllerBase
         user.Disabled = dto.Disabled;
 
         await _us.UpdateUserAsync(user);
+
+        return Ok(_userCnv.ConvertUserToDto(user));
+    }
+
+    [Authorize(Roles = Role.ROLE_ADMIN)]
+    [HttpPut("role")]
+    public async Task<ActionResult<UserDto>> UpdateRole([FromBody] UpdateRoleRequest req)
+    {
+        _logger.LogInformation($"Triggered PUT api/v1/user/role: {req}", req);
+
+        var user = await _us.UpdateRole(req);
+
+        return Ok(_userCnv.ConvertUserToDto(user));
+    }
+
+    [HttpPut("me/password")]
+    public async Task<ActionResult<UserDto>> ChangePassword([FromBody] ChangePasswordRequest req)
+    {
+        _logger.LogInformation($"Triggered PUT api/v1/user/me/password: {req}");
+
+        int userId = int.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
+        _logger.LogDebug($"Extracted userId from token: {userId}");
+
+        var user = await _us.ChangePassword(req, userId);
 
         return Ok(_userCnv.ConvertUserToDto(user));
     }

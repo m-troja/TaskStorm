@@ -1,105 +1,109 @@
 ﻿using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Logging;
 using Moq;
+using System;
+using System.Threading.Tasks;
 using TaskStorm.Controller;
-using TaskStorm.Model.DTO.Cnv;
+using TaskStorm.Model.DTO;
 using TaskStorm.Model.Entity;
 using TaskStorm.Model.Request;
 using TaskStorm.Model.Response;
 using TaskStorm.Service;
-using TaskStorm.Service.Impl;
+using TaskStorm.Exception.LoginException;
+using TaskStorm.Exception.UserException;
 using Xunit;
 
-namespace TaskStorm.Tests.Controller;
-
-public class LoginControllerTest
+namespace TaskStorm.Tests.Controller
 {
-    private LoginController CreateController( Mock<ILoginService> loginService )
-    {   
-        var refreshTokenCnv = new RefreshTokenCnv();
-        var logger = new LoggerFactory().CreateLogger<LoginService>();
-        return new LoginController(logger, loginService.Object);
-    }
-
-    [Fact]
-    public async Task Login_ShouldReturnTokenResponse_WhenCredentialsAreValid()
+    public class LoginControllerTests
     {
-        // arrange
-        var loginService = new Mock<ILoginService>();
+        private readonly Mock<ILoginService> _loginServiceMock;
+        private readonly ILogger<LoginController> _logger;
 
-        var controller = CreateController(loginService);
+        public LoginControllerTests()
+        {
+            _loginServiceMock = new Mock<ILoginService>();
+            _logger = new LoggerFactory().CreateLogger<LoginController>();
+        }
 
-        var request = new LoginRequest("user@test.com", "password");
-        var user = new User { Id = 5, Email = "user@test.com" };
-        var accessToken = new AccessToken("new-access-token", DateTime.UtcNow.AddMinutes(2));
-        TokenResponseDto tokenResponseDto = new TokenResponseDto( accessToken, 
-            new Model.DTO.RefreshTokenDto("new-refresh-token", DateTime.UtcNow.AddDays(7))
-        );
-        loginService.Setup(s => s.LoginAsync(request)).ReturnsAsync(tokenResponseDto);
+        private LoginController CreateController() => new LoginController(_logger, _loginServiceMock.Object);
 
-        // act
-        var result = await controller.Login(request);
+        [Fact]
+        public async Task Login_ShouldReturnOk_WhenCredentialsValid()
+        {
+            // arrange
+            var controller = CreateController();
+            var request = new LoginRequest("test@test.com", "password123");
 
-        // assert
-        var ok = Assert.IsType<OkObjectResult>(result.Result);
-        var dto = Assert.IsType<TokenResponseDto>(ok.Value);
+            var accessToken = new AccessToken("access-token", DateTime.UtcNow.AddMinutes(5));
+            var refreshTokenDto = new RefreshTokenDto("refresh-token", DateTime.UtcNow.AddMinutes(30));
+            var tokenResponse = new TokenResponseDto(accessToken, refreshTokenDto);
 
-        Assert.Equal("new-access-token", dto.AccessToken.Token);
-        Assert.Equal("new-refresh-token", dto.RefreshToken.Token);
+            _loginServiceMock
+                .Setup(s => s.LoginAsync(request))
+                .ReturnsAsync(tokenResponse);
 
-        loginService.Verify(s => s.LoginAsync(request), Times.Once);
-    }
+            // act
+            var result = await controller.Login(request);
 
-    [Fact]
-    public async Task Login_ShouldReturnUnauthorized_WhenUserIsNull()
-    {
-        // arrange
-        var loginService = new Mock<ILoginService>();
-        var controller = CreateController(loginService);
+            // assert
+            var okResult = Assert.IsType<OkObjectResult>(result.Result);
+            var returnedDto = Assert.IsType<TokenResponseDto>(okResult.Value);
 
-        var request = new LoginRequest("user@test.com", "pw123");
+            Assert.Equal(tokenResponse.AccessToken.Token, returnedDto.AccessToken.Token);
+            Assert.Equal(tokenResponse.AccessToken.Expires, returnedDto.AccessToken.Expires);
+            Assert.Equal(tokenResponse.RefreshToken.Token, returnedDto.RefreshToken.Token);
+            Assert.Equal(tokenResponse.RefreshToken.Expires, returnedDto.RefreshToken.Expires);
 
-        loginService
-            .Setup(s => s.LoginAsync(request))
-            .ReturnsAsync((TokenResponseDto?)null);
+            _loginServiceMock.Verify(s => s.LoginAsync(request), Times.Once);
+        }
 
-        // act
-        var result = await controller.Login(request);
+        [Fact]
+        public async Task Login_ShouldReturnUnauthorized_WhenInvalidEmailOrPassword()
+        {
+            var controller = CreateController();
+            var request = new LoginRequest("wrong@test.com", "password123");
 
-        // assert
-        var unauthorized = Assert.IsType<UnauthorizedObjectResult>(result.Result);
-        var response = Assert.IsType<Response>(unauthorized.Value);
+            _loginServiceMock
+                .Setup(s => s.LoginAsync(request))
+                .ThrowsAsync(new InvalidEmailOrPasswordException("Wrong email or password"));
 
-        Assert.Equal(ResponseType.ERROR, response.responseType);
-        Assert.Contains("user@test.com", response.message);
-    }
+            var result = await controller.Login(request);
 
+            var unauthorized = Assert.IsType<UnauthorizedObjectResult>(result.Result);
+            Assert.Contains("Wrong email or password", unauthorized.Value.ToString());
+        }
 
-    [Fact]
-    public async Task Login_ShouldReturnNullAccessToken_WhenAuthServiceFails()
-    {
-        // arrange
-        var loginService = new Mock<ILoginService>();
-        var controller = CreateController(loginService);
+        [Fact]
+        public async Task Login_ShouldReturnUnauthorized_WhenUserDisabled()
+        {
+            // arrange
+            var controller = CreateController();
+            var request = new LoginRequest("disabled@test.com", "password123");
 
-        var request = new LoginRequest("user@test.com", "pw");
-        var user = new User { Id = 77, Email = "user@test.com" };
+            _loginServiceMock
+                .Setup(s => s.LoginAsync(request))
+                .ThrowsAsync(new UserDisabledException("User account is disabled"));
 
-        var accessToken = new AccessToken("new-access-token", DateTime.UtcNow.AddMinutes(2));
-        TokenResponseDto tokenResponseDto = new TokenResponseDto(accessToken,
-            new Model.DTO.RefreshTokenDto("token", DateTime.UtcNow.AddDays(7))
-        );
-        loginService.Setup(s => s.LoginAsync(request)).ReturnsAsync(tokenResponseDto);
+            // act
+            var result = await controller.Login(request);
 
-        // act
-        var result = await controller.Login(request);
+            // assert
+            var unauthorizedResult = Assert.IsType<UnauthorizedObjectResult>(result.Result);
+            Assert.Contains("User account is disabled", unauthorizedResult.Value.ToString());
+        }
 
-        // assert
-        var ok = Assert.IsType<OkObjectResult>(result.Result);
-        var dto = Assert.IsType<TokenResponseDto>(ok.Value);
+        [Fact]
+        public async Task Login_ShouldReturnBadRequest_WhenRequestIsNull()
+        {
+            var controller = CreateController();
 
-        Assert.Equal("token", dto.RefreshToken.Token);
+            var result = await controller.Login(null!);
 
-        loginService.Verify(s => s.LoginAsync(request), Times.Once);
+            var badRequest = Assert.IsType<BadRequestObjectResult>(result.Result);
+            Assert.Equal("Request cannot be null", badRequest.Value);
+
+            _loginServiceMock.Verify(s => s.LoginAsync(It.IsAny<LoginRequest>()), Times.Never);
+        }
     }
 }

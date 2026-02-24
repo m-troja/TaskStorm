@@ -1,77 +1,66 @@
 ﻿using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Logging;
 using Moq;
-using System;
 using System.Threading.Tasks;
 using TaskStorm.Controller;
-using TaskStorm.Model.DTO;
-using TaskStorm.Model.DTO.Cnv;
-using TaskStorm.Model.Entity;
+using TaskStorm.Exception.Tokens;
 using TaskStorm.Model.Request;
 using TaskStorm.Model.Response;
 using TaskStorm.Service;
-using TaskStorm.Service.Impl;
 using Xunit;
 
 namespace TaskStorm.Tests.Controller;
 
 public class AuthControllerTests
 {
-    private readonly Mock<ILogger<LoginService>> _mockLogger = new();
-    private readonly Mock<IAuthService> _mockAuthService = new();
+    private readonly Mock<IAuthService> _mockAuthService;
+    private readonly AuthController _controller;
 
-    private AuthController CreateController() {
-        return new AuthController (_mockLogger.Object, _mockAuthService.Object);
-    }
-
-    [Fact]
-    public async Task RegenerateTokens_ShouldReturnOk_WhenRefreshTokenIsValid()
+    public AuthControllerTests()
     {
-
-        // given
-        var req = new RefreshTokenRequest("valid-token");
-        var tokenResponseDto = new TokenResponseDto(
-           new AccessToken("new-access-token", DateTime.UtcNow.AddMinutes(2)),
-            new RefreshTokenDto("token", DateTime.UtcNow.AddDays(7))
-            );
-
-        _mockAuthService.Setup(x => x.RegenerateTokensByRefreshToken(req.RefreshToken)).ReturnsAsync(tokenResponseDto);
-        _mockAuthService.Setup(x => x.ValidateRefreshTokenRequest(req.RefreshToken)).ReturnsAsync(true);
-
-        var controller = CreateController();
-
-        // when
-        var result = await controller.RegenerateTokensByRefreshToken(req);
-
-        // then
-        var okResult = Assert.IsType<OkObjectResult>(result.Result);
-        var tokenResponse = Assert.IsType<TokenResponseDto>(okResult.Value);
-
-        Assert.Equal(tokenResponseDto, tokenResponse);
+        _mockAuthService = new Mock<IAuthService>();
+        var mockLogger = new Mock<ILogger<AuthController>>();
+        _controller = new AuthController(mockLogger.Object, _mockAuthService.Object);
     }
 
     [Fact]
     public async Task RegenerateTokens_ShouldReturnUnauthorized_WhenRefreshTokenIsInvalid()
     {
-        // given
-        var req = new RefreshTokenRequest("invalid-token");
-        var tokenResponseDto = new TokenResponseDto(
-            new AccessToken("access-token", DateTime.Parse("2046-02-01T00:00:00Z")),
-            new RefreshTokenDto("refresh-token", DateTime.Parse("2024-02-01T00:00:00Z"))
-            );
+        // Arrange
+        var invalidToken = "invalid-token";
 
-        _mockAuthService.Setup(x => x.RegenerateTokensByRefreshToken(req.RefreshToken)).ReturnsAsync(tokenResponseDto);
+        _mockAuthService
+            .Setup(s => s.RegenerateTokensByRefreshToken(invalidToken))
+            .ThrowsAsync(new InvalidRefreshTokenException("Invalid token"));
 
-        var controller = CreateController();
+        var request = new RefreshTokenRequest(invalidToken);
 
-        // when
-        var result = await controller.RegenerateTokensByRefreshToken(req);
+        // Act
+        var result = await _controller.RegenerateTokensByRefreshToken(request);
 
-        // then
+        // Assert
         var unauthorizedResult = Assert.IsType<UnauthorizedObjectResult>(result.Result);
-        var response = Assert.IsType<Response>(unauthorizedResult.Value);
+        Assert.Equal("Invalid token", unauthorizedResult.Value);
+    }
 
-        Assert.Equal(ResponseType.ERROR, response.responseType);
-        Assert.Equal("Validation failed", response.message);
+    [Fact]
+    public async Task RegenerateTokens_ShouldReturnOk_WhenRefreshTokenIsValid()
+    {
+        // Arrange
+        var validToken = "valid-token";
+        var tokenResponse = new TokenResponseDto(null, null);
+
+        _mockAuthService
+            .Setup(s => s.RegenerateTokensByRefreshToken(validToken))
+            .ReturnsAsync(tokenResponse);
+
+        var request = new RefreshTokenRequest(validToken);
+
+        // Act
+        var result = await _controller.RegenerateTokensByRefreshToken(request);
+
+        // Assert
+        var okResult = Assert.IsType<OkObjectResult>(result.Result);
+        Assert.Equal(tokenResponse, okResult.Value);
     }
 }
