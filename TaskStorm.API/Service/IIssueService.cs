@@ -24,7 +24,7 @@ namespace TaskStorm.Service
         Task<int> GetIssueIdFromKey(string key);
         Task<IEnumerable<IssueDto>> GetAllIssues();
         Task deleteAllIssues();
-        Task DeleteIssueByIdAsync(int id);
+        Task DeleteIssueByIdAsync(int id, int userId);
         Task<IEnumerable<IssueDto>> GetIssuesByTeamId(int teamId);
 
     }

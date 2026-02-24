@@ -4,6 +4,7 @@ using TaskStorm.Exception.GptException;
 using TaskStorm.Model.DTO;
 using TaskStorm.Model.DTO.ChatGpt;
 using TaskStorm.Model.DTO.Cnv;
+using TaskStorm.Model.Entity;
 using TaskStorm.Model.IssueFolder;
 using TaskStorm.Tools;
 namespace TaskStorm.Service.Impl;
@@ -76,7 +77,13 @@ public class SlackNotificationService : ISlackNotificationService
         var chatEvent = new ChatGptDto(ChatGptEvent.COMMENT_CREATED, issueDto);
         await sendEventToChatGpt(chatEvent);
     }
-
+    public async Task SendIssueDeletedNotificationAsync(Issue issue, User author)
+    {
+        issue.Author = author;
+        var issueDto = _issueCnv.ConvertIssueToIssueDtoChatGpt(issue);
+        var chatEvent = new ChatGptDto(ChatGptEvent.ISSUE_DELETED, issueDto);
+        await sendEventToChatGpt(chatEvent);
+    }
     private async Task sendEventToChatGpt(ChatGptDto chatEvent)
     {
         try

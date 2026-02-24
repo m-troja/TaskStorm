@@ -1,5 +1,6 @@
 ﻿using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using System.Security.Claims;
 using TaskStorm.Exception;
 using TaskStorm.Exception.IssueException;
 using TaskStorm.Log;
@@ -157,8 +158,24 @@ public class IssueController : ControllerBase
     [HttpDelete("{id:int}")]
     public async Task<ActionResult<string>> DeletelIssueById(int id)
     {
+        int userId = int.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
+
         l.LogInformation($"Triggered endpoint DeletelIssueById {id}");
-        await _is.DeleteIssueByIdAsync(id);
+        try
+        {
+            await _is.DeleteIssueByIdAsync(id, userId);
+
+        }
+        catch (IssueNotFoundException)
+        {
+            l.LogWarning($"DeletelIssueById: Issue with id {id} not found for deletion");
+            throw;
+        }
+        catch (BadRequestException)
+        {
+            l.LogWarning($"DeletelIssueById: author == null - skip deleting issue");
+            throw;
+        }
         return Ok($"Deleted issue {id}");
     }
 

@@ -1,4 +1,5 @@
-﻿using TaskStorm.Model.IssueFolder;
+﻿using TaskStorm.Model.Entity;
+using TaskStorm.Model.IssueFolder;
 
 namespace TaskStorm.Service;
     public interface ISlackNotificationService
@@ -9,4 +10,5 @@ namespace TaskStorm.Service;
         Task SendIssuePriorityChangedNotificationAsync(Issue issue);
         Task SendIssueDueDateUpdatedNotificationAsync(Issue issue);
         Task SendCommentAddedNotificationAsync(Issue issue);
+        Task SendIssueDeletedNotificationAsync(Issue issue, User author);
 }

@@ -451,10 +451,25 @@ public class IssueService : IIssueService
         l.LogInformation("Deleted all issues from database");
     }
 
-    public async Task DeleteIssueByIdAsync(int id)
+    public async Task DeleteIssueByIdAsync(int id, int userId)
     {
+        var issue = await GetIssueFromDb(id);
+        if (issue == null)
+        {
+            throw new IssueNotFoundException("Issue was not found - skip deleting issue");
+        }
+        var author = await  _db.Users.FirstOrDefaultAsync(u => u.Id == issue.AuthorId);
+        if (author == null)
+        {
+            throw new BadRequestException("Author user was not found - skip deleting issue");
+        }
+
+
         await _db.Database.ExecuteSqlRawAsync("DELETE FROM Issues WHERE id = {0}", id);
         l.LogInformation($"Deleted issue where Id={id}");
+        await _slackNotificationService.SendIssueDeletedNotificationAsync(issue, author);
+        l.LogInformation($"Sent issue deleted notification for issue ID {id} to ChatGPT");
+
     }
 
     private async Task createSystemUserId()
