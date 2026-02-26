@@ -7,4 +7,4 @@ public record CreateIssueRequest(
     int authorId, 
     int? assigneeId, 
     string? dueDate, 
-    int? projectId )  {}
+    int projectId )  {}

@@ -21,6 +21,7 @@ public class CommentService : ICommentService
     private readonly CommentCnv _commentCnv;
     private readonly ILogger<CommentService> logger;
     private readonly ISlackNotificationService _slackNotificationService;
+    private readonly IActivityService _activityService;
     public async Task<CommentDto> CreateCommentAsync(CreateCommentRequest req)
     {
         var issue = await _issueService.GetIssueByIdAsync(req.IssueId);
@@ -35,6 +36,10 @@ public class CommentService : ICommentService
         _db.Comments.Add(comment);
         await _db.SaveChangesAsync();
         await _slackNotificationService.SendCommentAddedNotificationAsync(issue);
+
+        var activity = await _activityService.CreateActivityPropertyCreatedAsync(ActivityType.CREATED_COMMENT, issue.Id, comment.AuthorId);
+        logger.LogInformation($"Created comment with Id={comment.Id} for IssueId={req.IssueId} by AuthorId={req.AuthorId}");
+        logger.LogInformation($"Created activity with Id={activity.Id} for CommentId={comment.Id} and IssueId={issue.Id}");
         return _commentCnv.EntityToDto(comment);
     }
     public async Task<CommentDto> EditCommentAsync(EditCommentRequest req)
@@ -62,7 +67,7 @@ public class CommentService : ICommentService
         return _commentCnv.EntityListToDtoList(comments);
     }
 
-    public CommentService(PostgresqlDbContext db, IIssueService issueService, IUserService userService, CommentCnv commentCnv, ILogger<CommentService> logger, ISlackNotificationService slackNotificationService)
+    public CommentService(PostgresqlDbContext db, IIssueService issueService, IUserService userService, CommentCnv commentCnv, ILogger<CommentService> logger, ISlackNotificationService slackNotificationService, IActivityService activityService)
     {
         _db = db;
         _issueService = issueService;
@@ -70,6 +75,7 @@ public class CommentService : ICommentService
         _commentCnv = commentCnv;
         this.logger = logger;
         _slackNotificationService = slackNotificationService;
+        _activityService = activityService;
     }
 
     public async Task DeleteAllCommentsByIssueId(int issueId)

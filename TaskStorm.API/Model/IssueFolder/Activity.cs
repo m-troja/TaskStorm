@@ -11,7 +11,8 @@ public abstract class Activity
     public int IssueId { get; set; }
 
 
-    protected Activity(ActivityType type, int IssueId)
+    protected Activity(ActivityType type, int IssueId
+        )
     {
         this.IssueId = IssueId;
         this.Type = type;

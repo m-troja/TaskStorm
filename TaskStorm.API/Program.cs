@@ -166,6 +166,7 @@ try
     builder.Services.AddScoped<IssueCnv>();
     builder.Services.AddScoped<ProjectCnv>();
     builder.Services.AddScoped<RefreshTokenCnv>();
+    builder.Services.AddScoped<ActivityCnv>();
     builder.Services.AddScoped<ISlackNotificationService, SlackNotificationService>();
     builder.Services.AddScoped<IFileService, FileService>();
 

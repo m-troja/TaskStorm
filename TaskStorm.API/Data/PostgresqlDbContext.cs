@@ -43,6 +43,12 @@ public class PostgresqlDbContext : DbContext
 
             var connectionString =
                 $"Host={dbHost};Port={dbPort};Database={dbName};Username={dbUser};Password={dbPassword};SearchPath=public";
+            Console.WriteLine("DB connection details:");
+            Console.WriteLine($"DB={dbName}");
+            Console.WriteLine($"Host={dbHost}");
+            Console.WriteLine($"Port={dbPort}");
+            Console.WriteLine($"Username={dbUser}");
+            Console.WriteLine($"Password={dbPassword}");
 
             optionsBuilder
                 .UseNpgsql(connectionString)

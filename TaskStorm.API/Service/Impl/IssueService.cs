@@ -77,7 +77,7 @@ public class IssueService : IIssueService
         Project project;
         try
         {
-            project = await _projectService.GetProjectById(reqValidated.projectId.Value);
+            project = await _projectService.GetProjectById(reqValidated.projectId);
         }
         catch (ProjectNotFoundException e)
         {
@@ -130,7 +130,7 @@ public class IssueService : IIssueService
             
             l.LogDebug($"Keystring {issue.Key.KeyString} for id {issue.Id} and IdInsideProject {issue.IdInsideProject}");
 
-            var activity = await _activityService.CreateActivityPropertyCreatedAsync(ActivityType.CREATED_ISSUE, issue.Id);
+            var activity = await _activityService.CreateActivityPropertyCreatedAsync(ActivityType.CREATED_ISSUE, issue.Id, issue.AuthorId);
         }
         catch (System.Exception )
         {
@@ -316,7 +316,7 @@ public class IssueService : IIssueService
         var UpdatedIssue = await UpdateIssueAsync(issue);
         IssueDto issueDto = _issueCnv.ConvertIssueToIssueDto(UpdatedIssue);
         
-        var activity = await _activityService.CreateActivityPropertyUpdatedAsync(ActivityType.UPDATED_STATUS, ((int)oldStatus).ToString(), ((int)issue.Status).ToString(), issue.Id);
+        var activity = await _activityService.CreateActivityPropertyUpdatedAsync(ActivityType.UPDATED_STATUS, oldStatus.ToString(), issue.Status.ToString(), issue.Id);
         await _slackNotificationService.SendIssueStatusChangedNotificationAsync(issue);
         return issueDto;
     }
@@ -337,8 +337,8 @@ public class IssueService : IIssueService
         IssueDto issueDto = _issueCnv.ConvertIssueToIssueDto(UpdatedIssue);
         var activity = await _activityService.CreateActivityPropertyUpdatedAsync(
             ActivityType.UPDATED_PRIORITY, 
-            oldPriority.HasValue ? ((int)oldPriority.Value).ToString() : "-1", 
-            ((int)issue.Priority).ToString(), 
+            oldPriority.HasValue ? oldPriority.Value.ToString() : "None", 
+            issue.Priority.ToString() ?? "Undefined", 
             issue.Id);
         await _slackNotificationService.SendIssuePriorityChangedNotificationAsync(issue);
         return issueDto;
@@ -489,14 +489,14 @@ public class IssueService : IIssueService
     {
         l.LogDebug($"Fetching issue entity for issueId {id}");
         var issue = await _db.Issues
-    .Include(i => i.Key)
-    .Include(i => i.Author)
-    .Include(i => i.Assignee)
-    .Include(i => i.Project)
-    .Include(i => i.Team).ThenInclude(t => t.Users)
-    .Include(i => i.Comments).ThenInclude(c => c.Author)
-    .Include(i => i.Comments).ThenInclude(c => c.Attachments)
-    .FirstOrDefaultAsync(i => i.Id == id);
+            .Include(i => i.Key)
+            .Include(i => i.Author)
+            .Include(i => i.Assignee)
+            .Include(i => i.Project)
+            .Include(i => i.Team).ThenInclude(t => t.Users)
+            .Include(i => i.Comments).ThenInclude(c => c.Author)
+            .Include(i => i.Comments).ThenInclude(c => c.Attachments)
+            .FirstOrDefaultAsync(i => i.Id == id);
         l.LogDebug($"Fetched issue: {issue}");
 
         return issue ?? throw new IssueNotFoundException("Issue " + id + " was not found");

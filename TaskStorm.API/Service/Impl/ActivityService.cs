@@ -2,6 +2,7 @@
 using TaskStorm.Model.Entity;
 using TaskStorm.Model.IssueFolder;
 using TaskStorm.Log;
+using Microsoft.EntityFrameworkCore;
 namespace TaskStorm.Service.Impl;
 
 public class ActivityService : IActivityService
@@ -17,13 +18,28 @@ public class ActivityService : IActivityService
         await _db.SaveChangesAsync();
         return activity;    
     }
-    public async Task<ActivityPropertyCreated> CreateActivityPropertyCreatedAsync(ActivityType Type, int issueId)
+    public async Task<ActivityPropertyCreated> CreateActivityPropertyCreatedAsync(ActivityType Type, int issueId, int authorId)
     {
-        l.LogDebug($"Creating ActivityPropertyCreated: Type={Type}, issueId={issueId}");
-        var activity = new ActivityPropertyCreated(Type, issueId);
+        l.LogDebug($"Creating ActivityPropertyCreated: Type={Type}, issueId={issueId}, authorId={authorId}");
+        var activity = new ActivityPropertyCreated(Type, issueId, authorId);
         _db.Activities.Add(activity);
         await _db.SaveChangesAsync();
         return activity;
+    }
+    public async Task<List<Activity>> GetActivitiesByIssueIdAsync(int issueId)
+    {
+       l.LogDebug($"Getting activities for issueId={issueId}");
+        var activities = await _db.Activities.Where(a => a.IssueId == issueId).ToListAsync();
+
+        l.LogDebug($"Found {activities.Count} activities for issueId={issueId}");
+        return activities;
+    }
+    public async Task DeleteActivitiesForIssueId(int id)
+    {
+        _db.Activities.RemoveRange(_db.Activities.Where(a => a.IssueId == id));
+        l.LogDebug($"Deleted activities for issueId={id}");
+        await _db.SaveChangesAsync();
+
     }
 
     public ActivityService(PostgresqlDbContext db, ILogger<ActivityService> l)

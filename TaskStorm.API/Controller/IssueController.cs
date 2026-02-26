@@ -22,6 +22,9 @@ public class IssueController : ControllerBase
     private readonly IIssueService _is;
     private readonly ILogger<IssueController> l;
     private readonly IssueCnv _issueCnv;
+    private readonly ActivityCnv _activityCnv;
+    private readonly IActivityService _activityService;
+
 
     [Authorize]
     [HttpPost]
@@ -187,10 +190,21 @@ public class IssueController : ControllerBase
         return Ok("All issues deleted successfully");
     }
 
-    public IssueController(IIssueService @is, ILogger<IssueController> l, IssueCnv _issueCnv)
+    [HttpGet("{id:int}/activities")]
+    public async Task<ActionResult<List<ActivityDto>>> GetActivitiesByIssueId(int id)
     {
+        l.LogDebug($"Received get activities by issue id request: {id}");
+        var activities = await _activityService.GetActivitiesByIssueIdAsync(id);
+        var dtos = _activityCnv.EntityListToDtoList(activities);
+        return Ok(dtos);
+    }
+
+    public IssueController(IIssueService @is, ILogger<IssueController> l, IssueCnv _issueCnv, IActivityService _activityService, ActivityCnv activityCnv)
+    {
+        this._activityService = _activityService;
         _is = @is;
         this.l = l;
         this._issueCnv = _issueCnv;
+        _activityCnv = activityCnv;
     }
 }

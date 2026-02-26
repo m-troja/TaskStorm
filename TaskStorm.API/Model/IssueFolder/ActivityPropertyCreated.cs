@@ -5,9 +5,10 @@ namespace TaskStorm.Model.IssueFolder;
 
 public class ActivityPropertyCreated : Activity
 {
-    public ActivityPropertyCreated(ActivityType Type, int issueId) : base(Type, issueId)
+    public int AuthorId { get; set; }
+    public ActivityPropertyCreated(ActivityType Type, int issueId, int authorId) : base(Type, issueId)
     {
-        this.Type = Type;
-        IssueId = issueId;
+        AuthorId = authorId;
+
     }
 }

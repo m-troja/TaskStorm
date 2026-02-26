@@ -7,4 +7,7 @@ public enum ActivityType
     UPDATED_ASSIGNEE,
     UPDATED_PRIORITY,
     UPDATED_STATUS,
+    UPDATED_TITLE,
+    UPDATED_DESCRIPTION
+
 }

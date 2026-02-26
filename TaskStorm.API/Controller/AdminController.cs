@@ -1,6 +1,7 @@
 ﻿using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Mvc.Infrastructure;
 using Swashbuckle.AspNetCore.Annotations;
 using System.ComponentModel.DataAnnotations;
 using System.Security.Claims;
@@ -26,6 +27,7 @@ public class AdminController : ControllerBase
     private readonly ILogger<AuthController> _logger;
     private readonly IAuthService _authService;
     private readonly IUserService _userService;
+    private readonly IActivityService _activityService;
     private readonly UserCnv _userCnv;
 
     [HttpPut("password")]
@@ -45,11 +47,21 @@ public class AdminController : ControllerBase
         return Ok(_userCnv.ConvertUserToDto(user));
     }
 
-    public AdminController(ILogger<AuthController> _logger, IAuthService authService, IUserService userService , UserCnv userCnv)
+    [HttpDelete("activity/issue/{id:int}")]
+    public async Task<ActionResult> DeleteActivitiesForIssueId(int id
+        )
+    {
+        _logger.LogInformation($"Triggered DELETE api/v1/admin/activity/issue/{id}");
+        await _activityService.DeleteActivitiesForIssueId(id);
+        return NoContent();
+    }
+
+    public AdminController(ILogger<AuthController> _logger, IAuthService authService, IUserService userService , UserCnv userCnv, IActivityService _activityService)
     {
         this._logger = _logger;
         _authService = authService;
         _userService = userService;
         _userCnv = userCnv;
+        this._activityService = _activityService;
     }
 }
