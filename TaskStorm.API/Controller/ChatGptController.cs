@@ -1,5 +1,6 @@
 ﻿using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using System.Security.Claims;
 using TaskStorm.Model.DTO;
 using TaskStorm.Model.DTO.Cnv;
 using TaskStorm.Model.Request;
@@ -37,8 +38,10 @@ public class ChatGptController : ControllerBase
     [HttpPut("issue/assign")]
     public async Task<IssueDtoChatGpt> AssignIssueByChatGpt([FromBody] AssignIssueRequestChatGpt req)
     {
-        l.LogInformation($"Received AssignIssueBySlack request: {req}");
-        var issue = await _iss.AssignIssueBySlackAsync(req);
+        int userId = int.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
+
+        l.LogInformation($"Received AssignIssueBySlack request: {req}, userId={userId}");
+        var issue = await _iss.AssignIssueBySlackAsync(req, userId);
         return _issueCnv.ConvertIssueToIssueDtoChatGpt(issue);
     }
 
