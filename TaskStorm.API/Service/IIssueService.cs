@@ -1,6 +1,7 @@
-﻿using TaskStorm.Model.IssueFolder;
+﻿using TaskStorm.Model.DTO;
+using TaskStorm.Model.Entity;
+using TaskStorm.Model.IssueFolder;
 using TaskStorm.Model.Request;
-using TaskStorm.Model.DTO;
 
 namespace TaskStorm.Service
 {
@@ -12,13 +13,13 @@ namespace TaskStorm.Service
         Task<Issue> CreateIssueAsync(CreateIssueRequest cir);
         Task<IssueDtoChatGpt> CreateIssueBySlackAsync(SlackCreateIssueRequest scis);
 
-        Task<Issue> AssignIssueAsync(AssignIssueRequest uir);
-        Task<Issue> AssignIssueBySlackAsync(AssignIssueRequestChatGpt uir);
+        Task<Issue> AssignIssueAsync(AssignIssueRequest uir, int userId);
+        Task<Issue> AssignIssueBySlackAsync(AssignIssueRequestChatGpt uir, int userId);
         Task<IssueDto> RenameIssueAsync(RenameIssueRequest rir);
-        Task<IssueDto> ChangeIssueStatusAsync(ChangeIssueStatusRequest req);
-        Task<IssueDto> ChangeIssuePriorityAsync(ChangeIssuePriorityRequest req);
-        Task<IssueDto> AssignTeamAsync(AssignTeamRequest req);
-        Task<IssueDto> UpdateDueDateAsync(UpdateDueDateRequest req);
+        Task<IssueDto> ChangeIssueStatusAsync(ChangeIssueStatusRequest req, int userId);
+        Task<IssueDto> ChangeIssuePriorityAsync(ChangeIssuePriorityRequest req, int userId);
+        Task<IssueDto> AssignTeamAsync(AssignTeamRequest req, int userId);
+        Task<IssueDto> UpdateDueDateAsync(UpdateDueDateRequest req,  int userId);
         Task<IEnumerable<IssueDto>> GetIssuesByUserId(int userId);
         Task<IEnumerable<IssueDto>> GetIssuesByProjectId(int projectId);
         Task<int> GetIssueIdFromKey(string key);

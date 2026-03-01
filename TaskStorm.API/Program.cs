@@ -138,6 +138,10 @@ try
         var dbUser = Environment.GetEnvironmentVariable("TS_DB_USER") ?? "postgres";
         var dbPassword = Environment.GetEnvironmentVariable("TS_DB_PASSWORD") ?? "postgres";
 
+        Log.Information("DB Host: {Host}:{Port}", dbHost, dbPort);
+        Log.Information("DB User: {User}", dbUser);
+        Log.Information("DB Name: {dbName}", dbName);
+
         var connectionString =
             $"Host={dbHost};Port={dbPort};Database={dbName};Username={dbUser};Password={dbPassword};SearchPath=public";
 

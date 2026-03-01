@@ -214,9 +214,9 @@ public class IssueService : IIssueService
         return _issueCnv.ConvertIssueToIssueDto(issue);
     }
 
-    public async Task<Issue> AssignIssueAsync(AssignIssueRequest req)
+    public async Task<Issue> AssignIssueAsync(AssignIssueRequest req, int userId)
     {
-        l.LogDebug($"Assigning issue {req.IssueId} to user {req.AssigneeId}");
+        l.LogDebug($"Assigning issue {req.IssueId} to user {req.AssigneeId}, event author={userId}");
         var newAssignee = await _db.Users.AnyAsync(u => u.Id == req.AssigneeId) ? await _userService.GetByIdAsync(req.AssigneeId) : throw new BadRequestException("Assignee user was not found") ;
         l.LogDebug($"Fetched new assignee: {newAssignee}");
         var issue = await GetIssueFromDb(req.IssueId);
@@ -236,18 +236,18 @@ public class IssueService : IIssueService
         Issue updatedIssue = await UpdateIssueAsync(issue);
         l.LogDebug($"Updated issue {updatedIssue.Id} in database");
 
-        var activity = await _activityService.CreateActivityPropertyUpdatedAsync(ActivityType.UPDATED_ASSIGNEE, (oldAssignee.Id).ToString(), (newAssignee.Id).ToString(), issue.Id);
+        var activity = await _activityService.CreateActivityPropertyUpdatedAsync(ActivityType.UPDATED_ASSIGNEE, (oldAssignee.Id).ToString(), (newAssignee.Id).ToString(), issue.Id, userId);
         await _slackNotificationService.SendIssueAssignedNotificationAsync(issue);
         l.LogDebug($"Sent issue assigned notification for issue {issue.Id} to ChatGPT");
         return updatedIssue;
     }
-    public async Task<Issue> AssignIssueBySlackAsync(AssignIssueRequestChatGpt req)
+    public async Task<Issue> AssignIssueBySlackAsync(AssignIssueRequestChatGpt req, int userId)
     {
         l.LogDebug($"Assigning issue by Slack with key {req.key} to Slack user ID {req.slackUserId}");
         int issueId = await GetIssueIdFromKey(req.key);
         int newAssigneeId = await _userService.GetIdBySlackUserId(req.slackUserId);
         var assignIssueRequest = new AssignIssueRequest(issueId, newAssigneeId);
-        var issue = await AssignIssueAsync(assignIssueRequest);
+        var issue = await AssignIssueAsync(assignIssueRequest,userId);
         l.LogDebug($"Assigned issue {issueId} to user {newAssigneeId} successfully");
         return issue;
     }
@@ -298,7 +298,7 @@ public class IssueService : IIssueService
         return issueDto;
     }
 
-    public async Task<IssueDto> ChangeIssueStatusAsync(ChangeIssueStatusRequest req)
+    public async Task<IssueDto> ChangeIssueStatusAsync(ChangeIssueStatusRequest req, int userId)
     {
         l.LogDebug($"Changing status of issue {req.IssueId} to {req.NewStatus}");
 
@@ -316,13 +316,13 @@ public class IssueService : IIssueService
         var UpdatedIssue = await UpdateIssueAsync(issue);
         IssueDto issueDto = _issueCnv.ConvertIssueToIssueDto(UpdatedIssue);
         
-        var activity = await _activityService.CreateActivityPropertyUpdatedAsync(ActivityType.UPDATED_STATUS, oldStatus.ToString(), issue.Status.ToString(), issue.Id);
+        var activity = await _activityService.CreateActivityPropertyUpdatedAsync(ActivityType.UPDATED_STATUS, ((int)oldStatus).ToString(), ((int)issue.Status).ToString(), issue.Id, userId);
         await _slackNotificationService.SendIssueStatusChangedNotificationAsync(issue);
         return issueDto;
     }
 
-    public async Task<IssueDto> ChangeIssuePriorityAsync(ChangeIssuePriorityRequest req)
-    {
+    public async Task<IssueDto> ChangeIssuePriorityAsync(ChangeIssuePriorityRequest req, int userId)
+{
         l.LogDebug($"Changing priority of issue {req.IssueId} to {req.NewPriority}");
         if (req.NewPriority == null) throw new ArgumentException("NewPriority cannot be empty");
         if (req.IssueId <= 0) throw new ArgumentException("IssueId must be greater than 0");
@@ -337,16 +337,17 @@ public class IssueService : IIssueService
         IssueDto issueDto = _issueCnv.ConvertIssueToIssueDto(UpdatedIssue);
         var activity = await _activityService.CreateActivityPropertyUpdatedAsync(
             ActivityType.UPDATED_PRIORITY, 
-            oldPriority.HasValue ? oldPriority.Value.ToString() : "None", 
-            issue.Priority.ToString() ?? "Undefined", 
-            issue.Id);
+            oldPriority.HasValue ? ((int)oldPriority.Value).ToString() : "-1", 
+            ((int)issue.Priority).ToString(), 
+            issue.Id,
+            userId);
         await _slackNotificationService.SendIssuePriorityChangedNotificationAsync(issue);
         return issueDto;
     }
 
-    public async Task<IssueDto> AssignTeamAsync(AssignTeamRequest req)
+    public async Task<IssueDto> AssignTeamAsync(AssignTeamRequest req, int userId)
     {
-        l.LogDebug($"Assigning team {req.TeamId} to issue {req.IssueId}");
+        l.LogDebug($"Assigning team {req.TeamId} to issue {req.IssueId}, userId={userId}");
         Team team = await _teamService.GetTeamByIdAsync(req.TeamId);
         Issue issue = await GetIssueFromDb(req.IssueId);
         issue.Team = team;
@@ -402,13 +403,13 @@ public class IssueService : IIssueService
         return issueId;
     }
 
-    public async Task<IssueDto> UpdateDueDateAsync(UpdateDueDateRequest req)
-    {
-        DateTime dueDateUtc = DateTime.SpecifyKind(req.DueDate.Value, DateTimeKind.Utc);
-        Issue issue = await GetIssueFromDb(req.IssueId);
+    public async Task<IssueDto> UpdateDueDateAsync(UpdateDueDateRequest req, int userId)
+{
+        var dueDateUtc = DateTime.SpecifyKind(req.DueDate.Value, DateTimeKind.Utc);
+        var issue = await GetIssueFromDb(req.IssueId);
         issue.DueDate = dueDateUtc;
         l.LogDebug($"Set due date {issue.DueDate} for issue {issue.Id}");
-        Issue updatedIssue = await UpdateIssueAsync(issue);
+        var updatedIssue = await UpdateIssueAsync(issue);
         await _slackNotificationService.SendIssueDueDateUpdatedNotificationAsync(updatedIssue);
         return _issueCnv.ConvertIssueToIssueDto(updatedIssue);
     }

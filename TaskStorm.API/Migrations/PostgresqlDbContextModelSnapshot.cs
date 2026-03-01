@@ -508,6 +508,10 @@ namespace TaskStorm.Migrations
                         .HasColumnType("text")
                         .HasColumnName("old_value");
 
+                    b.Property<int>("userId")
+                        .HasColumnType("integer")
+                        .HasColumnName("user_id");
+
                     b.HasDiscriminator().HasValue("Updated");
                 });
 
