@@ -3,12 +3,9 @@ using TaskStorm.Model.IssueFolder;
 
 public interface IActivityService
 {
-    Task<ActivityPropertyUpdated> CreateActivityPropertyUpdatedAsync(
-        ActivityType Type,
-        string OldValue,
-        string NewValue,
-        int issueId,
-        int userId);
+
+    public Task<ActivityPropertyUpdated> CreateActivityPropertyUpdatedAsync(ActivityType Type, string OldValue, string NewValue, int issueId, int userId);
+    public Task<ActivityPropertyCreated> CreateActivityPropertyCreatedAsync(ActivityType Type, int issueId);
 
     Task<ActivityPropertyCreated> CreateActivityPropertyCreatedAsync(
         ActivityType Type,

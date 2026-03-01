@@ -315,12 +315,8 @@ public class IssueService : IIssueService
 
         var UpdatedIssue = await UpdateIssueAsync(issue);
         IssueDto issueDto = _issueCnv.ConvertIssueToIssueDto(UpdatedIssue);
-        
-<<<<<<< HEAD
-        var activity = await _activityService.CreateActivityPropertyUpdatedAsync(ActivityType.UPDATED_STATUS, oldStatus.ToString(), issue.Status.ToString(), issue.Id);
-=======
+
         var activity = await _activityService.CreateActivityPropertyUpdatedAsync(ActivityType.UPDATED_STATUS, ((int)oldStatus).ToString(), ((int)issue.Status).ToString(), issue.Id, userId);
->>>>>>> 7382e60 (Activity userid)
         await _slackNotificationService.SendIssueStatusChangedNotificationAsync(issue);
         return issueDto;
     }
@@ -340,11 +336,12 @@ public class IssueService : IIssueService
         var UpdatedIssue = await UpdateIssueAsync(issue);
         IssueDto issueDto = _issueCnv.ConvertIssueToIssueDto(UpdatedIssue);
         var activity = await _activityService.CreateActivityPropertyUpdatedAsync(
-         ActivityType.UPDATED_PRIORITY,
-         oldPriority.HasValue ? ((int)oldPriority.Value).ToString() : "-1",
-         ((int)issue.Priority).ToString(),
-         issue.Id,
-         userId);
+
+            ActivityType.UPDATED_PRIORITY, 
+            oldPriority.HasValue ? ((int)oldPriority.Value).ToString() : "-1", 
+            ((int)issue.Priority).ToString(), 
+            issue.Id,
+            userId);
         await _slackNotificationService.SendIssuePriorityChangedNotificationAsync(issue);
         return issueDto;
     }
