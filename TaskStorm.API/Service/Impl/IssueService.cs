@@ -216,6 +216,13 @@ public class IssueService : IIssueService
 
     public async Task<Issue> AssignIssueAsync(AssignIssueRequest req, int userId)
     {
+        var eventAuthorUser = await _db.Users.FirstOrDefaultAsync(u => u.Id == userId);
+        if (eventAuthorUser == null)
+        {
+            l.LogDebug($"Event author user with ID {userId} was not found");
+            throw new BadRequestException("Event author user was not found");
+        }
+
         l.LogDebug($"Assigning issue {req.IssueId} to user {req.AssigneeId}, event author={userId}");
         var newAssignee = await _db.Users.AnyAsync(u => u.Id == req.AssigneeId) ? await _userService.GetByIdAsync(req.AssigneeId) : throw new BadRequestException("Assignee user was not found") ;
         l.LogDebug($"Fetched new assignee: {newAssignee}");
@@ -249,6 +256,13 @@ public class IssueService : IIssueService
     }
     public async Task<Issue> AssignIssueBySlackAsync(AssignIssueRequestChatGpt req, int userId)
     {
+        var eventAuthorUser = await _db.Users.FirstOrDefaultAsync(u => u.Id == userId);
+        if (eventAuthorUser == null)
+        {
+            l.LogDebug($"Event author user with ID {userId} was not found");
+            throw new BadRequestException("Event author user was not found");
+        }
+
         l.LogDebug($"Assigning issue by Slack with key {req.key} to Slack user ID {req.slackUserId}");
         int issueId = await GetIssueIdFromKey(req.key);
         int newAssigneeId = await _userService.GetIdBySlackUserId(req.slackUserId);
@@ -306,6 +320,13 @@ public class IssueService : IIssueService
 
     public async Task<IssueDto> ChangeIssueStatusAsync(ChangeIssueStatusRequest req, int userId)
     {
+        var eventAuthorUser = await _db.Users.FirstOrDefaultAsync(u => u.Id == userId);
+        if (eventAuthorUser == null)
+        {
+            l.LogDebug($"Event author user with ID {userId} was not found");
+            throw new BadRequestException("Event author user was not found");
+        }
+
         l.LogDebug($"Changing status of issue {req.IssueId} to {req.NewStatus}");
 
         if (req.NewStatus == null) throw new ArgumentException("NewStatus cannot be null");
@@ -328,7 +349,14 @@ public class IssueService : IIssueService
     }
 
     public async Task<IssueDto> ChangeIssuePriorityAsync(ChangeIssuePriorityRequest req, int userId)
-{
+    {
+        var eventAuthorUser = await _db.Users.FirstOrDefaultAsync(u => u.Id == userId);
+        if (eventAuthorUser == null)
+        {
+            l.LogDebug($"Event author user with ID {userId} was not found");
+            throw new BadRequestException("Event author user was not found");
+        }
+
         l.LogDebug($"Changing priority of issue {req.IssueId} to {req.NewPriority}");
         if (req.NewPriority == null) throw new ArgumentException("NewPriority cannot be empty");
         if (req.IssueId <= 0) throw new ArgumentException("IssueId must be greater than 0");
@@ -351,6 +379,13 @@ public class IssueService : IIssueService
 
     public async Task<IssueDto> AssignTeamAsync(AssignTeamRequest req, int userId)
     {
+        var eventAuthorUser = await _db.Users.FirstOrDefaultAsync(u => u.Id == userId);
+        if (eventAuthorUser == null)
+        {
+            l.LogDebug($"Event author user with ID {userId} was not found");
+            throw new BadRequestException("Event author user was not found");
+        }
+
         l.LogDebug($"Assigning team {req.TeamId} to issue {req.IssueId}, userId={userId}");
         Team team = await _teamService.GetTeamByIdAsync(req.TeamId);
         Issue issue = await GetIssueFromDb(req.IssueId);
@@ -411,7 +446,14 @@ public class IssueService : IIssueService
     }
 
     public async Task<IssueDto> UpdateDueDateAsync(UpdateDueDateRequest req, int userId)
-{
+    {
+        var eventAuthorUser = await _db.Users.FirstOrDefaultAsync(u => u.Id == userId);
+        if (eventAuthorUser == null)
+        {
+            l.LogDebug($"Event author user with ID {userId} was not found");
+            throw new BadRequestException("Event author user was not found");
+        }
+
         var dueDateUtc = DateTime.SpecifyKind(req.DueDate.Value, DateTimeKind.Utc);
         var issue = await GetIssueFromDb(req.IssueId);
         issue.DueDate = dueDateUtc;
