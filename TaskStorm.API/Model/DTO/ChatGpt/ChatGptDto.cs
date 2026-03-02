@@ -1,8 +1,11 @@
 ﻿
+using TaskStorm.Model.Entity;
+
 namespace TaskStorm.Model.DTO.ChatGpt;
 
 public record ChatGptDto
 (
-    ChatGptEvent Event,
-    IssueDtoChatGpt Issue
+    ActivityType Event,
+    IssueDtoChatGpt Issue,
+    string EventUserSlackId
 );

@@ -1,4 +1,5 @@
-﻿using Microsoft.EntityFrameworkCore;
+﻿using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
 using System.Text;
 using TaskStorm.Data;
 using TaskStorm.Exception;
@@ -130,7 +131,7 @@ public class IssueService : IIssueService
             
             l.LogDebug($"Keystring {issue.Key.KeyString} for id {issue.Id} and IdInsideProject {issue.IdInsideProject}");
 
-            var activity = await _activityService.CreateActivityPropertyCreatedAsync(ActivityType.CREATED_ISSUE, issue.Id, issue.AuthorId);
+            var activity = await _activityService.CreateIssueAsync(issue.Id, issue.AuthorId);
         }
         catch (System.Exception )
         {
@@ -139,7 +140,7 @@ public class IssueService : IIssueService
             throw;
         }
         l.LogDebug($"Issue creation transaction completed successfully for issue ID {issue.Id}");
-        await _slackNotificationService.SendIssueCreatedNotificationAsync(issue);
+        await _slackNotificationService.SendIssueCreatedNotificationAsync(issue, authorToSet);
         l.LogDebug($"Sent issue created notification for issue ID {issue.Id}");
 
         return issue;
@@ -191,7 +192,7 @@ public class IssueService : IIssueService
 
 
 
-        var issueDto = _issueCnv.ConvertIssueToIssueDto(issue);
+        var issueDto = _issueCnv.EntityToDto(issue);
         return issueDto;
     }
 
@@ -211,14 +212,22 @@ public class IssueService : IIssueService
 
         var issue = await GetIssueFromDb(issueId);
 
-        return _issueCnv.ConvertIssueToIssueDto(issue);
+        return _issueCnv.EntityToDto(issue);
     }
 
     public async Task<Issue> AssignIssueAsync(AssignIssueRequest req, int userId)
     {
+        var eventAuthorUser = await _db.Users.FirstOrDefaultAsync(u => u.Id == userId);
+        if (eventAuthorUser == null)
+        {
+            l.LogDebug($"Event author user with ID {userId} was not found");
+            throw new BadRequestException("Event author user was not found");
+        }
+
         l.LogDebug($"Assigning issue {req.IssueId} to user {req.AssigneeId}, event author={userId}");
         var newAssignee = await _db.Users.AnyAsync(u => u.Id == req.AssigneeId) ? await _userService.GetByIdAsync(req.AssigneeId) : throw new BadRequestException("Assignee user was not found") ;
         l.LogDebug($"Fetched new assignee: {newAssignee}");
+        
         var issue = await GetIssueFromDb(req.IssueId);
 
         User? oldAssignee;
@@ -228,7 +237,12 @@ public class IssueService : IIssueService
             l.LogDebug("Old assignee was null or 0, assigning to system user for activity log");
             oldAssignee = await _db.Users.FirstOrDefaultAsync(u => u.Id == SystemUserId);
         };
-        
+
+        if (oldAssignee == null) {
+            l.LogDebug("System user assignee was not found in database");
+            throw new ServerException("System user assignee was not found in database");
+        }
+
         issue.Assignee = newAssignee;
         issue.AssigneeId = newAssignee.Id;
         l.LogDebug($"Set assignee {issue.Assignee} for issue {issue.Id}");
@@ -236,13 +250,20 @@ public class IssueService : IIssueService
         Issue updatedIssue = await UpdateIssueAsync(issue);
         l.LogDebug($"Updated issue {updatedIssue.Id} in database");
 
-        var activity = await _activityService.CreateActivityPropertyUpdatedAsync(ActivityType.UPDATED_ASSIGNEE, (oldAssignee.Id).ToString(), (newAssignee.Id).ToString(), issue.Id, userId);
-        await _slackNotificationService.SendIssueAssignedNotificationAsync(issue);
+        var activity = await _activityService.UpdateAssigneeAsync(oldAssignee.Id, newAssignee.Id, issue.Id, userId);
+        await _slackNotificationService.SendIssueAssignedNotificationAsync(issue, eventAuthorUser);
         l.LogDebug($"Sent issue assigned notification for issue {issue.Id} to ChatGPT");
         return updatedIssue;
     }
     public async Task<Issue> AssignIssueBySlackAsync(AssignIssueRequestChatGpt req, int userId)
     {
+        var eventAuthorUser = await _db.Users.FirstOrDefaultAsync(u => u.Id == userId);
+        if (eventAuthorUser == null)
+        {
+            l.LogDebug($"Event author user with ID {userId} was not found");
+            throw new BadRequestException("Event author user was not found");
+        }
+
         l.LogDebug($"Assigning issue by Slack with key {req.key} to Slack user ID {req.slackUserId}");
         int issueId = await GetIssueIdFromKey(req.key);
         int newAssigneeId = await _userService.GetIdBySlackUserId(req.slackUserId);
@@ -285,21 +306,41 @@ public class IssueService : IIssueService
         return issue;
     }
 
-    public async Task<IssueDto> RenameIssueAsync(RenameIssueRequest req)
+    public async Task<IssueDto> RenameIssueAsync(RenameIssueRequest req, int userId)
     {
-        l.LogDebug($"Renaming issue {req.id} to new title: {req.newTitle}");
-        Issue issue = await GetIssueFromDb(req.id);
+        var eventAuthorUser = await _db.Users.FirstOrDefaultAsync(u => u.Id == userId);
+        if (eventAuthorUser == null)
+        {
+            l.LogDebug($"Event author user with ID {userId} was not found");
+            throw new BadRequestException("Event author user was not found");
+        }
+
+
+        l.LogDebug($"Renaming issue {req.IssueId} to new title: {req.newTitle}");
+        Issue issue = await GetIssueFromDb(req.IssueId);
+        var oldTitle = issue.Title;
         issue.Title = req.newTitle;
         Issue updatedIssue = await UpdateIssueAsync(issue);
         l.LogDebug($"Renamed issue {updatedIssue.Id} successfully");
         _db.Issues.Update(updatedIssue);
         await _db.SaveChangesAsync();
-        IssueDto issueDto = _issueCnv.ConvertIssueToIssueDto(updatedIssue);
+        IssueDto issueDto = _issueCnv.EntityToDto(updatedIssue);
+
+        var activity = await _activityService.UpdateTitleAsync(oldTitle, issue.Title, issue.Id, userId);
+        await _slackNotificationService.SendUpdateTitleAsync(issue, eventAuthorUser);
+
         return issueDto;
     }
 
     public async Task<IssueDto> ChangeIssueStatusAsync(ChangeIssueStatusRequest req, int userId)
     {
+        var eventAuthorUser = await _db.Users.FirstOrDefaultAsync(u => u.Id == userId);
+        if (eventAuthorUser == null)
+        {
+            l.LogDebug($"Event author user with ID {userId} was not found");
+            throw new BadRequestException("Event author user was not found");
+        }
+
         l.LogDebug($"Changing status of issue {req.IssueId} to {req.NewStatus}");
 
         if (req.NewStatus == null) throw new ArgumentException("NewStatus cannot be null");
@@ -314,15 +355,23 @@ public class IssueService : IIssueService
         issue.Status = Enum.Parse<IssueStatus>(req.NewStatus);
 
         var UpdatedIssue = await UpdateIssueAsync(issue);
-        IssueDto issueDto = _issueCnv.ConvertIssueToIssueDto(UpdatedIssue);
+        IssueDto issueDto = _issueCnv.EntityToDto(UpdatedIssue);
+        
+        var activity = await _activityService.UpdateStatusAsync(oldStatus, issue.Status, issue.Id, userId);
+        await _slackNotificationService.SendIssueStatusChangedNotificationAsync(issue, eventAuthorUser);
 
-        var activity = await _activityService.CreateActivityPropertyUpdatedAsync(ActivityType.UPDATED_STATUS, ((int)oldStatus).ToString(), ((int)issue.Status).ToString(), issue.Id, userId);
-        await _slackNotificationService.SendIssueStatusChangedNotificationAsync(issue);
         return issueDto;
     }
 
     public async Task<IssueDto> ChangeIssuePriorityAsync(ChangeIssuePriorityRequest req, int userId)
-{
+    {
+        var eventAuthorUser = await _db.Users.FirstOrDefaultAsync(u => u.Id == userId);
+        if (eventAuthorUser == null)
+        {
+            l.LogDebug($"Event author user with ID {userId} was not found");
+            throw new BadRequestException("Event author user was not found");
+        }
+
         l.LogDebug($"Changing priority of issue {req.IssueId} to {req.NewPriority}");
         if (req.NewPriority == null) throw new ArgumentException("NewPriority cannot be empty");
         if (req.IssueId <= 0) throw new ArgumentException("IssueId must be greater than 0");
@@ -334,27 +383,36 @@ public class IssueService : IIssueService
         IssuePriority? oldPriority = issue.Priority;
         issue.Priority = Enum.Parse<IssuePriority>(req.NewPriority);
         var UpdatedIssue = await UpdateIssueAsync(issue);
-        IssueDto issueDto = _issueCnv.ConvertIssueToIssueDto(UpdatedIssue);
-        var activity = await _activityService.CreateActivityPropertyUpdatedAsync(
+        IssueDto issueDto = _issueCnv.EntityToDto(UpdatedIssue);
+    
+        var oldPriorityForActivity = oldPriority == null ? IssuePriority.NORMAL : oldPriority.Value;
+        var newPriorityForActivity = issue.Priority == null ? IssuePriority.NORMAL : issue.Priority.Value;
 
-            ActivityType.UPDATED_PRIORITY, 
-            oldPriority.HasValue ? ((int)oldPriority.Value).ToString() : "-1", 
-            ((int)issue.Priority).ToString(), 
-            issue.Id,
-            userId);
-        await _slackNotificationService.SendIssuePriorityChangedNotificationAsync(issue);
+        var activity = await _activityService.UpdatePriorityAsync(oldPriorityForActivity, newPriorityForActivity, issue.Id, userId);
+        await _slackNotificationService.SendIssuePriorityChangedNotificationAsync(issue, eventAuthorUser);
         return issueDto;
     }
 
     public async Task<IssueDto> AssignTeamAsync(AssignTeamRequest req, int userId)
     {
+        var eventAuthorUser = await _db.Users.FirstOrDefaultAsync(u => u.Id == userId);
+        if (eventAuthorUser == null)
+        {
+            l.LogDebug($"Event author user with ID {userId} was not found");
+            throw new BadRequestException("Event author user was not found");
+        }
+
         l.LogDebug($"Assigning team {req.TeamId} to issue {req.IssueId}, userId={userId}");
         Team team = await _teamService.GetTeamByIdAsync(req.TeamId);
         Issue issue = await GetIssueFromDb(req.IssueId);
         issue.Team = team;
         var UpdatedIssue = await UpdateIssueAsync(issue);
-        IssueDto issueDto = _issueCnv.ConvertIssueToIssueDto(UpdatedIssue);
+        IssueDto issueDto = _issueCnv.EntityToDto(UpdatedIssue);
         l.LogDebug($"Assigned team {team.Name} to issue {issue.Id} successfully");
+
+        var oldTeamId = issue.TeamId.HasValue ? issue.TeamId.Value : -1;
+        var activity = await _activityService.UpdateTeamAsync(oldTeamId,  team.Id, issue.Id, userId);
+        await _slackNotificationService.SendTeamAssignedNotificationAsync(issue, eventAuthorUser);
         return issueDto;
     }
 
@@ -368,7 +426,7 @@ public class IssueService : IIssueService
         var issues = await GetListOfIssuesFromDb(issueIds);
 
         l.LogDebug($"Fetched {issues.Count} issues for userId {userId}");
-        var issuesDto = _issueCnv.ConvertIssueListToIssueDtoList(issues);
+        var issuesDto = _issueCnv.EntityListToDtoList(issues);
         return issuesDto;
     }
     public async Task<IEnumerable<IssueDto>> GetIssuesByTeamId(int teamId)
@@ -380,7 +438,7 @@ public class IssueService : IIssueService
         var issues = await GetListOfIssuesFromDb(issueIds);
 
         l.LogDebug($"Fetched {issues.Count} issues for userId {teamId}");
-        var issuesDto = _issueCnv.ConvertIssueListToIssueDtoList(issues);
+        var issuesDto = _issueCnv.EntityListToDtoList(issues);
         return issuesDto;
     }
     public async Task<IEnumerable<IssueDto>> GetIssuesByProjectId(int projectId)
@@ -390,7 +448,7 @@ public class IssueService : IIssueService
         var issueIds = await _db.Issues.Where(i => i.ProjectId == projectId).Select(i => i.Id).ToListAsync();
         var issues = await GetListOfIssuesFromDb(issueIds);
         l.LogDebug($"Fetched {issues.Count} issues for projectId {projectId}");
-        var issuesDto = _issueCnv.ConvertIssueListToIssueDtoList(issues);
+        var issuesDto = _issueCnv.EntityListToDtoList(issues);
         return issuesDto;
     }
 
@@ -405,14 +463,26 @@ public class IssueService : IIssueService
     }
 
     public async Task<IssueDto> UpdateDueDateAsync(UpdateDueDateRequest req, int userId)
-{
+    {
+        var eventAuthorUser = await _db.Users.FirstOrDefaultAsync(u => u.Id == userId);
+        if (eventAuthorUser == null)
+        {
+            l.LogDebug($"Event author user with ID {userId} was not found");
+            throw new BadRequestException("Event author user was not found");
+        }
+
         var dueDateUtc = DateTime.SpecifyKind(req.DueDate.Value, DateTimeKind.Utc);
         var issue = await GetIssueFromDb(req.IssueId);
         issue.DueDate = dueDateUtc;
         l.LogDebug($"Set due date {issue.DueDate} for issue {issue.Id}");
         var updatedIssue = await UpdateIssueAsync(issue);
-        await _slackNotificationService.SendIssueDueDateUpdatedNotificationAsync(updatedIssue);
-        return _issueCnv.ConvertIssueToIssueDto(updatedIssue);
+        await _slackNotificationService.SendIssueDueDateUpdatedNotificationAsync(updatedIssue, eventAuthorUser);
+        
+        var oldDueDate = issue.DueDate.HasValue ? issue.DueDate.Value : DateTime.MinValue;
+        var newDueDate = updatedIssue.DueDate.HasValue ? updatedIssue.DueDate.Value : DateTime.MinValue;
+
+        var activity = await _activityService.UpdateDueDateAsync(oldDueDate , newDueDate, issue.Id, userId);
+        return _issueCnv.EntityToDto(updatedIssue);
     }
 
     public async Task<IssueDtoChatGpt> CreateIssueBySlackAsync(SlackCreateIssueRequest req)
@@ -432,7 +502,7 @@ public class IssueService : IIssueService
              req.projectId != null ? req.projectId.Value : DummyProjectId   
          );
         var issue = await CreateIssueAsync(createIssueRequest);
-        var issueDto = _issueCnv.ConvertIssueToIssueDtoChatGpt(issue);
+        var issueDto = _issueCnv.EntityToIssueDtoChatGpt(issue);
         l.LogDebug($"Created issue via Slack successfully: {issueDto}");
         return issueDto;
     }
@@ -442,7 +512,7 @@ public class IssueService : IIssueService
         var issueIds = await _db.Issues.Select(i => i.Id).ToListAsync();
         var issues = await GetListOfIssuesFromDb(issueIds);
 
-        List<IssueDto> issueDtos = _issueCnv.ConvertIssueListToIssueDtoList(issues).ToList();
+        List<IssueDto> issueDtos = _issueCnv.EntityListToDtoList(issues).ToList();
         l.LogDebug($"GetAllIssues Fetched total {issueDtos.Count} issues from database");
         return issueDtos;
     }
@@ -472,6 +542,26 @@ public class IssueService : IIssueService
         await _slackNotificationService.SendIssueDeletedNotificationAsync(issue, author);
         l.LogInformation($"Sent issue deleted notification for issue ID {id} to ChatGPT");
 
+    }
+
+    public async Task<Issue> UpdateDescriptionAsync( UpdateDescriptionRequest req, int userId)
+    {
+        var issue = await GetIssueFromDb(req.issueId);
+        if (issue == null)
+        {
+            throw new IssueNotFoundException("Issue was not found - skip deleting issue");
+        }
+        var user = await _db.Users.FirstOrDefaultAsync(u => u.Id == userId);
+        var oldDesc = issue.Description;
+
+        issue.Description = req.newDescription;
+        
+        var updatedIssue = await UpdateIssueAsync(issue);
+        await _slackNotificationService.SendUpdateDescriptionAsync(updatedIssue, user);
+
+        var activity = await _activityService.UpdateDescriptionAsync(oldDesc, issue.Description, issue.Id, userId);
+
+        return updatedIssue;
     }
 
     private async Task createSystemUserId()

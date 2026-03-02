@@ -15,7 +15,7 @@ namespace TaskStorm.Service
 
         Task<Issue> AssignIssueAsync(AssignIssueRequest uir, int userId);
         Task<Issue> AssignIssueBySlackAsync(AssignIssueRequestChatGpt uir, int userId);
-        Task<IssueDto> RenameIssueAsync(RenameIssueRequest rir);
+        Task<IssueDto> RenameIssueAsync(RenameIssueRequest rir, int userId);
         Task<IssueDto> ChangeIssueStatusAsync(ChangeIssueStatusRequest req, int userId);
         Task<IssueDto> ChangeIssuePriorityAsync(ChangeIssuePriorityRequest req, int userId);
         Task<IssueDto> AssignTeamAsync(AssignTeamRequest req, int userId);
@@ -27,6 +27,7 @@ namespace TaskStorm.Service
         Task deleteAllIssues();
         Task DeleteIssueByIdAsync(int id, int userId);
         Task<IEnumerable<IssueDto>> GetIssuesByTeamId(int teamId);
+        Task<Issue> UpdateDescriptionAsync(UpdateDescriptionRequest req, int userId);
 
     }
 }

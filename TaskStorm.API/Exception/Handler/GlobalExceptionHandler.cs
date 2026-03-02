@@ -44,6 +44,7 @@ namespace TaskStorm.Exception.Handler
                     InvalidRefreshTokenException => StatusCodes.Status400BadRequest,
                     GptConnectionException => StatusCodes.Status408RequestTimeout,
                     BadRequestException => StatusCodes.Status400BadRequest,
+                    ServerException => StatusCodes.Status503ServiceUnavailable,
                     _ => StatusCodes.Status500InternalServerError
                 };
                 var errorResponse = new TaskStorm.Exception.Error.ErrorResponse(
@@ -61,6 +62,7 @@ namespace TaskStorm.Exception.Handler
                         InvalidRefreshTokenException => TaskStorm.Exception.Error.ErrorType.INVALID_REFRESH_TOKEN,
                         GptConnectionException => TaskStorm.Exception.Error.ErrorType.GPT_ERROR,
                         BadRequestException => TaskStorm.Exception.Error.ErrorType.BAD_REQUEST,
+                        ServerException => TaskStorm.Exception.Error.ErrorType.SERVER_ERROR,
                         _ => TaskStorm.Exception.Error.ErrorType.SERVER_ERROR
                     },
                     ex.Message

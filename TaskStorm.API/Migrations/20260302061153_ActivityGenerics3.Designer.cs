@@ -2,6 +2,7 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 using TaskStorm.Data;
@@ -11,9 +12,11 @@ using TaskStorm.Data;
 namespace TaskStorm.Migrations
 {
     [DbContext(typeof(PostgresqlDbContext))]
-    partial class PostgresqlDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260302061153_ActivityGenerics3")]
+    partial class ActivityGenerics3
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -60,10 +63,6 @@ namespace TaskStorm.Migrations
                     b.Property<int>("CommentId")
                         .HasColumnType("integer")
                         .HasColumnName("comment_id");
-
-                    b.Property<int>("EventAuthorUserId")
-                        .HasColumnType("integer")
-                        .HasColumnName("event_author_user_id");
 
                     b.Property<int>("IssueId")
                         .HasColumnType("integer")
@@ -493,6 +492,10 @@ namespace TaskStorm.Migrations
                 {
                     b.HasBaseType("TaskStorm.Model.Entity.Activity");
 
+                    b.Property<int>("AuthorId")
+                        .HasColumnType("integer")
+                        .HasColumnName("author_id");
+
                     b.ToTable("activities", "public");
 
                     b.HasDiscriminator().HasValue("Created");
@@ -511,6 +514,10 @@ namespace TaskStorm.Migrations
                         .IsRequired()
                         .HasColumnType("text")
                         .HasColumnName("old_value");
+
+                    b.Property<int>("userId")
+                        .HasColumnType("integer")
+                        .HasColumnName("user_id");
 
                     b.HasDiscriminator().HasValue("Updated");
                 });

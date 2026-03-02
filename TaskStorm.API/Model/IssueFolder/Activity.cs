@@ -9,11 +9,15 @@ public abstract class Activity
     public DateTime Timestamp { get; set; } = DateTime.UtcNow;
     public Issue Issue { get; set; } = null!;
     public int IssueId { get; set; }
+    public int CommentId { get; set; }
+    public int EventAuthorUserId { get; set; }
+
 
 
     protected Activity(ActivityType type, int IssueId
         )
     {
+        this.EventAuthorUserId = EventAuthorUserId;
         this.IssueId = IssueId;
         this.Type = type;
     }

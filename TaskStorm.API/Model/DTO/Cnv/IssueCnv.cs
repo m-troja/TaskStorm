@@ -11,7 +11,7 @@ public class IssueCnv
     private readonly TeamCnv teamCnv;
     
 
-    public IssueDto ConvertIssueToIssueDto(Issue Issue)
+    public IssueDto EntityToDto(Issue Issue)
     {
         ICollection<CommentDto> commentDtos = _commentCnv.EntityListToDtoList(Issue.Comments);
         TeamDto teamDto = Issue.Team is not null
@@ -37,7 +37,7 @@ public class IssueCnv
         
         return issueDto;
     }
-    public IssueDtoChatGpt ConvertIssueToIssueDtoChatGpt(Issue Issue)
+    public IssueDtoChatGpt EntityToIssueDtoChatGpt(Issue Issue)
     {
         logger.LogDebug($"Converting {Issue} to IssueDtoChatGpt");
         logger.LogDebug($"Assignee is {Issue.Assignee}, Id {Issue.AssigneeId}");
@@ -57,17 +57,18 @@ public class IssueCnv
                 Issue.DueDate,
                 Issue.UpdatedAt,
                 commentDtos,
-                Issue.ProjectId
+                Issue.ProjectId,
+                Issue.Team?.Name ?? "No Team"
             );
         logger.LogInformation($"Converted IssueId: {Issue.Id} to {issueDto}");
         return issueDto;
     }
-    public List<IssueDto> ConvertIssueListToIssueDtoList(List<Issue> issues)
+    public List<IssueDto> EntityListToDtoList(List<Issue> issues)
     {
         var issueDtos = new List<IssueDto>();
         foreach (var issue in issues)
         {
-            issueDtos.Add(ConvertIssueToIssueDto(issue));
+            issueDtos.Add(EntityToDto(issue));
         }
         return issueDtos;
     }
