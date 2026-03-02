@@ -43,7 +43,7 @@ public class IssueController : ControllerBase
             throw;
         }
 
-        var issueDto = _issueCnv.ConvertIssueToIssueDto(issue);
+        var issueDto = _issueCnv.EntityToDto(issue);
         return Ok(issueDto);
     }
 
@@ -95,7 +95,7 @@ public class IssueController : ControllerBase
 
         l.LogDebug($"Received assign issue request: {req}, userId={userId}");
         var issue = await _is.AssignIssueAsync(req, userId);
-        return Ok(_issueCnv.ConvertIssueToIssueDto(issue));
+        return Ok(_issueCnv.EntityToDto(issue));
     }
 
     [HttpPut("rename")]

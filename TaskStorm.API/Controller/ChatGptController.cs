@@ -42,7 +42,7 @@ public class ChatGptController : ControllerBase
 
         l.LogInformation($"Received AssignIssueBySlack request: {req}, userId={userId}");
         var issue = await _iss.AssignIssueBySlackAsync(req, userId);
-        return _issueCnv.ConvertIssueToIssueDtoChatGpt(issue);
+        return _issueCnv.EntityToIssueDtoChatGpt(issue);
     }
 
     public ChatGptController(IUserService userService, ILogger<ChatGptController> logger, IIssueService iss, IssueCnv issueCnv)

@@ -191,7 +191,7 @@ public class IssueService : IIssueService
 
 
 
-        var issueDto = _issueCnv.ConvertIssueToIssueDto(issue);
+        var issueDto = _issueCnv.EntityToDto(issue);
         return issueDto;
     }
 
@@ -211,7 +211,7 @@ public class IssueService : IIssueService
 
         var issue = await GetIssueFromDb(issueId);
 
-        return _issueCnv.ConvertIssueToIssueDto(issue);
+        return _issueCnv.EntityToDto(issue);
     }
 
     public async Task<Issue> AssignIssueAsync(AssignIssueRequest req, int userId)
@@ -314,7 +314,7 @@ public class IssueService : IIssueService
         l.LogDebug($"Renamed issue {updatedIssue.Id} successfully");
         _db.Issues.Update(updatedIssue);
         await _db.SaveChangesAsync();
-        IssueDto issueDto = _issueCnv.ConvertIssueToIssueDto(updatedIssue);
+        IssueDto issueDto = _issueCnv.EntityToDto(updatedIssue);
         return issueDto;
     }
 
@@ -341,7 +341,7 @@ public class IssueService : IIssueService
         issue.Status = Enum.Parse<IssueStatus>(req.NewStatus);
 
         var UpdatedIssue = await UpdateIssueAsync(issue);
-        IssueDto issueDto = _issueCnv.ConvertIssueToIssueDto(UpdatedIssue);
+        IssueDto issueDto = _issueCnv.EntityToDto(UpdatedIssue);
         
         var activity = await _activityService.UpdateStatusAsync(ActivityType.UPDATED_STATUS, oldStatus, issue.Status, issue.Id, userId);
         await _slackNotificationService.SendIssueStatusChangedNotificationAsync(issue);
@@ -368,7 +368,7 @@ public class IssueService : IIssueService
         IssuePriority? oldPriority = issue.Priority;
         issue.Priority = Enum.Parse<IssuePriority>(req.NewPriority);
         var UpdatedIssue = await UpdateIssueAsync(issue);
-        IssueDto issueDto = _issueCnv.ConvertIssueToIssueDto(UpdatedIssue);
+        IssueDto issueDto = _issueCnv.EntityToDto(UpdatedIssue);
     
         var oldPriorityForActivity = oldPriority == null ? IssuePriority.NORMAL : oldPriority.Value;
         var newPriorityForActivity = issue.Priority == null ? IssuePriority.NORMAL : issue.Priority.Value;
@@ -391,11 +391,11 @@ public class IssueService : IIssueService
         Issue issue = await GetIssueFromDb(req.IssueId);
         issue.Team = team;
         var UpdatedIssue = await UpdateIssueAsync(issue);
-        IssueDto issueDto = _issueCnv.ConvertIssueToIssueDto(UpdatedIssue);
+        IssueDto issueDto = _issueCnv.EntityToDto(UpdatedIssue);
         l.LogDebug($"Assigned team {team.Name} to issue {issue.Id} successfully");
 
         var oldTeamId = issue.TeamId.HasValue ? issue.TeamId.Value : -1;
-        var activity = await _activityService.UpdateTeamAsync(ActivityType.UPDATE_TEAM, oldTeamId,  team.Id, issue.Id, userId);
+        var activity = await _activityService.UpdateTeamAsync(ActivityType.UPDATED_TEAM, oldTeamId,  team.Id, issue.Id, userId);
         return issueDto;
     }
 
@@ -409,7 +409,7 @@ public class IssueService : IIssueService
         var issues = await GetListOfIssuesFromDb(issueIds);
 
         l.LogDebug($"Fetched {issues.Count} issues for userId {userId}");
-        var issuesDto = _issueCnv.ConvertIssueListToIssueDtoList(issues);
+        var issuesDto = _issueCnv.EntityListToDtoList(issues);
         return issuesDto;
     }
     public async Task<IEnumerable<IssueDto>> GetIssuesByTeamId(int teamId)
@@ -421,7 +421,7 @@ public class IssueService : IIssueService
         var issues = await GetListOfIssuesFromDb(issueIds);
 
         l.LogDebug($"Fetched {issues.Count} issues for userId {teamId}");
-        var issuesDto = _issueCnv.ConvertIssueListToIssueDtoList(issues);
+        var issuesDto = _issueCnv.EntityListToDtoList(issues);
         return issuesDto;
     }
     public async Task<IEnumerable<IssueDto>> GetIssuesByProjectId(int projectId)
@@ -431,7 +431,7 @@ public class IssueService : IIssueService
         var issueIds = await _db.Issues.Where(i => i.ProjectId == projectId).Select(i => i.Id).ToListAsync();
         var issues = await GetListOfIssuesFromDb(issueIds);
         l.LogDebug($"Fetched {issues.Count} issues for projectId {projectId}");
-        var issuesDto = _issueCnv.ConvertIssueListToIssueDtoList(issues);
+        var issuesDto = _issueCnv.EntityListToDtoList(issues);
         return issuesDto;
     }
 
@@ -460,7 +460,7 @@ public class IssueService : IIssueService
         l.LogDebug($"Set due date {issue.DueDate} for issue {issue.Id}");
         var updatedIssue = await UpdateIssueAsync(issue);
         await _slackNotificationService.SendIssueDueDateUpdatedNotificationAsync(updatedIssue);
-        return _issueCnv.ConvertIssueToIssueDto(updatedIssue);
+        return _issueCnv.EntityToDto(updatedIssue);
     }
 
     public async Task<IssueDtoChatGpt> CreateIssueBySlackAsync(SlackCreateIssueRequest req)
@@ -480,7 +480,7 @@ public class IssueService : IIssueService
              req.projectId != null ? req.projectId.Value : DummyProjectId   
          );
         var issue = await CreateIssueAsync(createIssueRequest);
-        var issueDto = _issueCnv.ConvertIssueToIssueDtoChatGpt(issue);
+        var issueDto = _issueCnv.EntityToIssueDtoChatGpt(issue);
         l.LogDebug($"Created issue via Slack successfully: {issueDto}");
         return issueDto;
     }
@@ -490,7 +490,7 @@ public class IssueService : IIssueService
         var issueIds = await _db.Issues.Select(i => i.Id).ToListAsync();
         var issues = await GetListOfIssuesFromDb(issueIds);
 
-        List<IssueDto> issueDtos = _issueCnv.ConvertIssueListToIssueDtoList(issues).ToList();
+        List<IssueDto> issueDtos = _issueCnv.EntityListToDtoList(issues).ToList();
         l.LogDebug($"GetAllIssues Fetched total {issueDtos.Count} issues from database");
         return issueDtos;
     }

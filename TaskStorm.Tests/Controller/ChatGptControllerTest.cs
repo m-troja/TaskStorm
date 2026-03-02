@@ -84,7 +84,7 @@ public class ChatGptControllerTest
         var controller = CreateController();
         var req = new AssignIssueRequestChatGpt("PROJ-1", "U12345678");
         var expectedIssue = BuildIssue(req);
-        var expectedConvertedIssue = _issueCnv.ConvertIssueToIssueDtoChatGpt(expectedIssue);
+        var expectedConvertedIssue = _issueCnv.EntityToIssueDtoChatGpt(expectedIssue);
 
         _issueMock.Setup(service => service.AssignIssueBySlackAsync(req)).ReturnsAsync(expectedIssue);
 

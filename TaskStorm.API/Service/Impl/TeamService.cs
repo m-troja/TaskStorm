@@ -85,7 +85,7 @@ public class TeamService : ITeamService
             .Include(i => i.Comments)
             .ToListAsync();
         l.LogDebug($"Found {issues.Count} issues in team with id {teamId}");
-        return _issueCnv.ConvertIssueListToIssueDtoList(issues);
+        return _issueCnv.EntityListToDtoList(issues);
     }
 
     public async Task<List<UserDto>> GetUsersByTeamId(int teamId)

@@ -86,7 +86,7 @@ namespace TaskStorm.Model.DTO.Cnv
                         EventAuthorUserId = activityPropertyUpdated.EventAuthorUserId,
                         Timestamp = activityPropertyUpdated.Timestamp
                     },
-                    ActivityType.UPDATE_TEAM => new ActivityDto
+                    ActivityType.UPDATED_TEAM => new ActivityDto
                     {
                         ActivityType = activityPropertyUpdated.Type,
                         IssueId = activityPropertyUpdated.IssueId,
@@ -97,7 +97,9 @@ namespace TaskStorm.Model.DTO.Cnv
                     },
                     _ => new ActivityDto {
                     }
-                }
+                },
+
+                _ => new ActivityDto {}
 
             };
         }

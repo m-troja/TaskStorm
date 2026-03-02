@@ -15,6 +15,10 @@ public record IssueDtoChatGpt(
     DateTime? DueDate,
     DateTime? UpdatedAt, 
     ICollection<CommentDto> Comments, 
-    int ProjectId)
+    int ProjectId,
+    string TeamName
+
+
+    )
 { }
 

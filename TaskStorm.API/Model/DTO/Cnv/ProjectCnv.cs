@@ -18,7 +18,7 @@ public class ProjectCnv
             ShortName = project.ShortName,
             Description = project.Description,
             CreatedAt = project.CreatedAt,
-            Issues = project.Issues?.Select(i => _issueCnv.ConvertIssueToIssueDto(i)).ToList() ?? new List<IssueDto>(),
+            Issues = project.Issues?.Select(i => _issueCnv.EntityToDto(i)).ToList() ?? new List<IssueDto>(),
         };
     }
 
