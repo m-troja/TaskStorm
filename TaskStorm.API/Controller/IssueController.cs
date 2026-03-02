@@ -101,9 +101,21 @@ public class IssueController : ControllerBase
     [HttpPut("rename")]
     public async Task<ActionResult<IssueDto>> RenameIssue([FromBody] RenameIssueRequest req)
     {
-        l.LogDebug($"Received rename issue request: {req.id}, {req.newTitle}");
-        var issueDto = await _is.RenameIssueAsync(req);
+        int userId = int.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
+
+        l.LogDebug($"Received rename issue request: {req.IssueId}, {req.newTitle}");
+        var issueDto = await _is.RenameIssueAsync(req, userId);
         return Ok(issueDto);
+    }
+
+    [HttpPut("update-description")]
+    public async Task<ActionResult<Issue>> UpdateDescription([FromBody] UpdateDescriptionRequest req)
+    {
+        int userId = int.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
+
+        l.LogDebug($"Received update-description request: {req.issueId}, {req.newDescription}");
+        var issue = await _is.UpdateDescriptionAsync(req, userId);
+        return Ok(_issueCnv.EntityToDto(issue));
     }
 
     [HttpPut("assign-team")]

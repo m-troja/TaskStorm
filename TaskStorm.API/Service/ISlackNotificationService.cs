@@ -11,4 +11,7 @@ namespace TaskStorm.Service;
         Task SendIssueDueDateUpdatedNotificationAsync(Issue issue, User author);
         Task SendCommentAddedNotificationAsync(Issue issue, User author);
         Task SendIssueDeletedNotificationAsync(Issue issue, User author);
+        Task SendTeamAssignedNotificationAsync(Issue issue, User author);
+        Task SendUpdateDescriptionAsync(Issue issue, User author);
+        Task SendUpdateTitleAsync(Issue issue, User author);
 }

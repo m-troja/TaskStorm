@@ -10,18 +10,10 @@ public class ActivityService : IActivityService
     private readonly PostgresqlDbContext _db;
     private readonly ILogger<ActivityService> l;
 
-    public async Task<ActivityPropertyUpdated> CreateActivityPropertyUpdatedAsync(ActivityType Type, string OldValue, string NewValue, int issueId, int userId)
+    public async Task<ActivityPropertyCreated> CreateIssueAsync(int issueId, int authorId)
     {
-        l.LogDebug($"Creating ActivityPropertyUpdated: Type={Type}, OldValue={OldValue}, NewValue={NewValue}, issueId={issueId}, userId={userId}");
-        var activity = new ActivityPropertyUpdated(OldValue, NewValue, issueId, Type, userId);
-        _db.Activities.Add(activity);
-        await _db.SaveChangesAsync();
-        return activity;    
-    }
-    public async Task<ActivityPropertyCreated> CreateIssueAsync(ActivityType Type, int issueId, int authorId)
-    {
-        l.LogDebug($"Creating ActivityPropertyCreated: Type={Type}, issueId={issueId}, authorId={authorId}");
-        var activity = new ActivityPropertyCreated(Type, issueId, authorId);
+        l.LogDebug($"Creating ActivityPropertyCreated: issueId={issueId}, authorId={authorId}");
+        var activity = new ActivityPropertyCreated(ActivityType.CREATED_ISSUE, issueId, authorId);
         _db.Activities.Add(activity);
         await _db.SaveChangesAsync();
         return activity;
@@ -42,58 +34,76 @@ public class ActivityService : IActivityService
 
     }
 
-    public async Task<ActivityPropertyCreated> CreateCommenAsync(ActivityType Type, int issueId, int commentId, int EventAuthorId)
+    public async Task<ActivityPropertyCreated> CreateCommenAsync(int issueId, int commentId, int EventAuthorId)
     {
-        l.LogDebug($"Creating Comment Activity: Type={Type}, issueId={issueId}, commentId={commentId}");
-        var activity = new ActivityPropertyCreated(Type, issueId, EventAuthorId) { CommentId = commentId};
+        l.LogDebug($"Creating Comment Activity:issueId={issueId}, commentId={commentId}");
+        var activity = new ActivityPropertyCreated(ActivityType.CREATED_COMMENT, issueId, EventAuthorId) { CommentId = commentId};
         _db.Activities.Add(activity);
         await _db.SaveChangesAsync();
         return activity;
     }
 
-    public async Task<ActivityPropertyUpdated> UpdateStatusAsync(ActivityType Type, IssueStatus OldValue, IssueStatus NewValue, int issueId, int userId)
+    public async Task<ActivityPropertyUpdated> UpdateStatusAsync(IssueStatus OldValue, IssueStatus NewValue, int issueId, int userId)
     {
-        l.LogDebug($"Updating Status: Type={Type}, OldValue={OldValue}, NewValue={NewValue}, issueId={issueId}, userId={userId}");
-        var activity = new ActivityPropertyUpdated(OldValue.ToString(), NewValue.ToString(), issueId, Type, userId);
-        _db.Activities.Add(activity);
-        await _db.SaveChangesAsync();
-        return activity;
-
-    }
-
-    public async Task<ActivityPropertyUpdated> UpdatePriorityAsync(ActivityType Type, IssuePriority OldValue, IssuePriority NewValue, int issueId, int userId)
-    {
-        l.LogDebug($"Updating Priority: Type={Type}, OldValue={OldValue}, NewValue={NewValue}, issueId={issueId}, userId={userId}");
-        var activity = new ActivityPropertyUpdated(OldValue.ToString(), NewValue.ToString(), issueId, Type, userId);
-        _db.Activities.Add(activity);
-        await _db.SaveChangesAsync();
-        return activity;
-    }
-
-    public async Task<ActivityPropertyUpdated> UpdateAssigneeAsync(ActivityType Type, int OldValue, int NewValue, int issueId, int userId)
-    {
-        l.LogDebug($"Updating Assignee: Type={Type}, OldValue={OldValue}, NewValue={NewValue}, issueId={issueId}, userId={userId}");
-        var activity = new ActivityPropertyUpdated(OldValue.ToString(), NewValue.ToString(), issueId, Type, userId);
+        l.LogDebug($"Updating Status: OldValue={OldValue}, NewValue={NewValue}, issueId={issueId}, userId={userId}");
+        var activity = new ActivityPropertyUpdated(OldValue.ToString(), NewValue.ToString(), issueId, ActivityType.UPDATED_STATUS, userId);
         _db.Activities.Add(activity);
         await _db.SaveChangesAsync();
         return activity;
 
     }
 
-    public async Task<ActivityPropertyUpdated> UpdateTeamAsync(ActivityType Type, int OldValue, int NewValue, int issueId, int userId)
+    public async Task<ActivityPropertyUpdated> UpdatePriorityAsync(IssuePriority OldValue, IssuePriority NewValue, int issueId, int userId)
     {
-        l.LogDebug($"Updating Team: Type={Type}, OldValue={OldValue}, NewValue={NewValue}, issueId={issueId}, userId={userId}");
-        var activity = new ActivityPropertyUpdated(OldValue.ToString(), NewValue.ToString(), issueId, Type, userId);
+        l.LogDebug($"Updating Priority: OldValue={OldValue}, NewValue={NewValue}, issueId={issueId}, userId={userId}");
+        var activity = new ActivityPropertyUpdated(OldValue.ToString(), NewValue.ToString(), issueId, ActivityType.UPDATED_PRIORITY, userId);
         _db.Activities.Add(activity);
         await _db.SaveChangesAsync();
         return activity;
     }
 
-    public async Task<ActivityPropertyUpdated> UpdateDueDateAsync(ActivityType Type, DateTime OldValue, DateTime NewValue, int issueId, int userId)
+    public async Task<ActivityPropertyUpdated> UpdateAssigneeAsync(int OldValue, int NewValue, int issueId, int userId)
     {
-        l.LogDebug($"Updating DueDate: Type={Type}, OldValue={OldValue}, NewValue={NewValue}, issueId={issueId}, userId={userId}");
-        var activity = new ActivityPropertyUpdated(OldValue.ToString("o"), NewValue.ToString("o"), issueId, Type, userId);
+        l.LogDebug($"Updating Assignee: OldValue={OldValue}, NewValue={NewValue}, issueId={issueId}, userId={userId}");
+        var activity = new ActivityPropertyUpdated(OldValue.ToString(), NewValue.ToString(), issueId, ActivityType.UPDATED_ASSIGNEE, userId);
         _db.Activities.Add(activity);
+        await _db.SaveChangesAsync();
+        return activity;
+
+    }
+
+    public async Task<ActivityPropertyUpdated> UpdateTeamAsync(int OldValue, int NewValue, int issueId, int userId)
+    {
+        l.LogDebug($"Updating Team: OldValue={OldValue}, NewValue={NewValue}, issueId={issueId}, userId={userId}");
+        var activity = new ActivityPropertyUpdated(OldValue.ToString(), NewValue.ToString(), issueId, ActivityType.UPDATED_TEAM, userId);
+        _db.Activities.Add(activity);
+        await _db.SaveChangesAsync();
+        return activity;
+    }
+
+    public async Task<ActivityPropertyUpdated> UpdateDueDateAsync(DateTime OldValue, DateTime NewValue, int issueId, int userId)
+    {
+        l.LogDebug($"Updating DueDate: OldValue={OldValue}, NewValue={NewValue}, issueId={issueId}, userId={userId}");
+        var activity = new ActivityPropertyUpdated(OldValue.ToString("o"), NewValue.ToString("o"), issueId, ActivityType.UPDATED_DUEDATE, userId);
+        _db.Activities.Add(activity);
+        await _db.SaveChangesAsync();
+        return activity;
+    }
+
+    public async Task<ActivityPropertyUpdated> UpdateDescriptionAsync(string OldValue, string NewValue, int issueId, int userId)
+    {
+        l.LogDebug($"Updating description {OldValue} to {NewValue} ");
+        var activity = new ActivityPropertyUpdated(OldValue, NewValue, issueId, ActivityType.UPDATED_DESCRIPTION, userId);
+        _db.Activities.Add(activity);
+        await _db.SaveChangesAsync();
+        return activity;
+    }
+
+    public async Task<ActivityPropertyUpdated> UpdateTitleAsync(string OldValue, string NewValue, int issueId, int userId)
+    {
+        l.LogDebug($"Updating title {OldValue} to {NewValue} ");
+        var activity = new ActivityPropertyUpdated(OldValue, NewValue, issueId, ActivityType.UPDATED_TITLE, userId);
+        await _db.Activities.AddAsync(activity);
         await _db.SaveChangesAsync();
         return activity;
     }
@@ -103,4 +113,5 @@ public class ActivityService : IActivityService
         _db = db;
         this.l = l;
     }
+
 }

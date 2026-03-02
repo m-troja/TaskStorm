@@ -39,7 +39,7 @@ namespace TaskStorm.Model.DTO.Cnv
 
                 ActivityPropertyUpdated activityPropertyUpdated => activityPropertyUpdated.Type switch
                 {
-                    ActivityType.UPDATED_DESCRIPTION => new ActivityDto
+                    ActivityType.UPDATED_DESCRIPTION or ActivityType.UPDATED_TITLE => new ActivityDto
                     {
                         ActivityType = activityPropertyUpdated.Type,
                         IssueId = activityPropertyUpdated.IssueId,

@@ -88,6 +88,14 @@ public class SlackNotificationService : ISlackNotificationService
         var chatEvent = new ChatGptDto(ActivityType.DELETED_ISSUE, issueDto, author.SlackUserId);
         await sendEventToChatGpt(chatEvent);
     }
+    public async Task SendTeamAssignedNotificationAsync(Issue issue, User author)
+    {
+        logger.LogDebug("Preparing to send team assigned notification for issue {issueId} to ChatGPT by slackUserId {slack}", issue.Id, author.SlackUserId);
+        var issueDto = _issueCnv.EntityToIssueDtoChatGpt(issue);
+        var chatEvent = new ChatGptDto(ActivityType.UPDATED_TEAM, issueDto, author.SlackUserId);
+        await sendEventToChatGpt(chatEvent);
+    }
+
     private async Task sendEventToChatGpt(ChatGptDto chatEvent)
     {
         try
@@ -114,5 +122,21 @@ public class SlackNotificationService : ISlackNotificationService
             logger.LogError(ex, "Error while sending event to ChatGPT");
             //throw new GptConnectionException("Error connecting to ChatGPT server"); 
         }
+    }
+
+    public async Task SendUpdateDescriptionAsync(Issue issue, User author)
+    {
+        logger.LogDebug("Preparing to SendUpdateDescription notification for issue {issueId} to ChatGPT by slackUserId {slack}", issue.Id, author.SlackUserId);
+        var issueDto = _issueCnv.EntityToIssueDtoChatGpt(issue);
+        var chatEvent = new ChatGptDto(ActivityType.UPDATED_DESCRIPTION, issueDto, author.SlackUserId);
+        await sendEventToChatGpt(chatEvent);
+    }
+
+    public Task SendUpdateTitleAsync(Issue issue, User author)
+    {
+        logger.LogDebug("Preparing to SendUpdateTitle notification for issue {issueId} to ChatGPT by slackUserId {slack}", issue.Id, author.SlackUserId);
+        var issueDto = _issueCnv.EntityToIssueDtoChatGpt(issue);
+        var chatEvent = new ChatGptDto(ActivityType.UPDATED_TITLE, issueDto, author.SlackUserId);
+        return sendEventToChatGpt(chatEvent);
     }
 }

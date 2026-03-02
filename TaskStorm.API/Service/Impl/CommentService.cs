@@ -35,9 +35,9 @@ public class CommentService : ICommentService
         };
         _db.Comments.Add(comment);
         await _db.SaveChangesAsync();
-        await _slackNotificationService.SendCommentAddedNotificationAsync(issue);
+        await _slackNotificationService.SendCommentAddedNotificationAsync(issue, user);
 
-        var activity = await _activityService.CreateCommenAsync(ActivityType.CREATED_COMMENT, issue.Id, comment.Id,  userId);
+        var activity = await _activityService.CreateCommenAsync(issue.Id, comment.Id,  userId);
         logger.LogInformation($"Created comment with Id={comment.Id} for IssueId={req.IssueId} by AuthorId={req.AuthorId}");
         logger.LogInformation($"Created activity with Id={activity.Id} for CommentId={comment.Id} , IssueId={issue.Id}, userId={userId}");
         return _commentCnv.EntityToDto(comment);

@@ -7,13 +7,14 @@ public interface IActivityService
 {
     Task<List<Activity>> GetActivitiesByIssueIdAsync(int issueId);
     Task DeleteActivitiesForIssueId(int id);
-    Task<ActivityPropertyCreated> CreateIssueAsync(ActivityType Type, int issueId, int creatorUserId);
-    Task<ActivityPropertyCreated> CreateCommenAsync(ActivityType Type, int issueId, int commentId, int EventAuthorId);
-    Task<ActivityPropertyUpdated> CreateActivityPropertyUpdatedAsync(ActivityType Type, string OldValue, string NewValue, int issueId, int userId);
-    Task<ActivityPropertyUpdated> UpdateStatusAsync(ActivityType Type, IssueStatus OldValue, IssueStatus NewValue, int issueId, int userId);
-    Task<ActivityPropertyUpdated> UpdatePriorityAsync(ActivityType Type, IssuePriority OldValue, IssuePriority NewValue, int issueId, int userId);
-    Task<ActivityPropertyUpdated> UpdateAssigneeAsync(ActivityType Type, int OldAssigneeId, int NewAssigneeId, int issueId, int userId);
-    Task<ActivityPropertyUpdated> UpdateTeamAsync(ActivityType Type, int OldTeamId, int NewTeamId, int issueId, int userId);
-    Task<ActivityPropertyUpdated> UpdateDueDateAsync(ActivityType Type, DateTime OldValue, DateTime NewValue, int issueId, int userId);
+    Task<ActivityPropertyCreated> CreateIssueAsync(int issueId, int creatorUserId);
+    Task<ActivityPropertyCreated> CreateCommenAsync(int issueId, int commentId, int EventAuthorId);
+    Task<ActivityPropertyUpdated> UpdateStatusAsync(IssueStatus OldValue, IssueStatus NewValue, int issueId, int userId);
+    Task<ActivityPropertyUpdated> UpdatePriorityAsync(IssuePriority OldValue, IssuePriority NewValue, int issueId, int userId);
+    Task<ActivityPropertyUpdated> UpdateAssigneeAsync(int OldAssigneeId, int NewAssigneeId, int issueId, int userId);
+    Task<ActivityPropertyUpdated> UpdateTeamAsync(int OldTeamId, int NewTeamId, int issueId, int userId);
+    Task<ActivityPropertyUpdated> UpdateDueDateAsync(DateTime OldValue, DateTime NewValue, int issueId, int userId);
+    Task<ActivityPropertyUpdated> UpdateDescriptionAsync(string OldValue, string NewValue, int issueId, int userId);
+    Task<ActivityPropertyUpdated> UpdateTitleAsync(string OldValue, string NewValue, int issueId, int userId);
 
 }

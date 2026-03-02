@@ -1,5 +1,5 @@
 ﻿namespace TaskStorm.Model.Request;
 
-public record RenameIssueRequest(int id, string newTitle)
+public record RenameIssueRequest(int IssueId, string newTitle)
 {
 }
