@@ -404,12 +404,15 @@ public class IssueService : IIssueService
         l.LogDebug($"Assigning team {req.TeamId} to issue {req.IssueId}, userId={userId}");
         Team team = await _teamService.GetTeamByIdAsync(req.TeamId);
         Issue issue = await GetIssueFromDb(req.IssueId);
+        var oldTeamId = issue.TeamId.HasValue ? issue.TeamId.Value : -1;
+
         issue.Team = team;
+        issue.TeamId = team.Id;
+
         var UpdatedIssue = await UpdateIssueAsync(issue);
         IssueDto issueDto = _issueCnv.EntityToDto(UpdatedIssue);
         l.LogDebug($"Assigned team {team.Name} to issue {issue.Id} successfully");
 
-        var oldTeamId = issue.TeamId.HasValue ? issue.TeamId.Value : -1;
         var activity = await _activityService.UpdateTeamAsync(oldTeamId,  team.Id, issue.Id, userId);
         await _slackNotificationService.SendTeamAssignedNotificationAsync(issue, eventAuthorUser);
         return issueDto;
