@@ -7,6 +7,8 @@ public class ActivityPropertyUpdated : Activity
     public string OldValue { get; set; } = string.Empty;
     public string NewValue { get; set; } = string.Empty;
     public int userId { get; set; } = -1;
+    public int CommentId { get; set; } = -1;
+
 
     public ActivityPropertyUpdated(string FromStringProperty, string ToStringProperty, int IssueId, ActivityType Type, int userId) : base(Type, IssueId)
 

@@ -9,61 +9,93 @@ namespace TaskStorm.Model.DTO.Cnv
 
         public ActivityDto EntityToDto(Activity a)
         {
-            _logger.LogInformation("Converting Activity entity to DTO. Activity ID: {ActivityId}, Type: {ActivityType}", a.Id, a.Type);
+            _logger.LogInformation("Converting Activity entity to DTO. Activity ID= {ActivityId}, Type= {ActivityType}", a.Id, a.Type);
 
             return a switch
             {
-                ActivityPropertyCreated activityPropertyCreated => new ActivityDto(
+                ActivityPropertyCreated activityPropertyCreated => activityPropertyCreated.Type switch
+                {
+                    ActivityType.CREATED_ISSUE => new ActivityDto
+                    {
+                        ActivityType = activityPropertyCreated.Type,
+                        IssueId = activityPropertyCreated.IssueId,
+                        EventAuthorUserId = activityPropertyCreated.AuthorId,
+                        Timestamp = activityPropertyCreated.Timestamp
+                    },
+                    ActivityType.CREATED_COMMENT => new ActivityDto
+                    {
+                        ActivityType = activityPropertyCreated.Type,
+                        IssueId = activityPropertyCreated.IssueId,
+                        CommentId = activityPropertyCreated.CommentId,
+                        EventAuthorUserId = activityPropertyCreated.AuthorId,
+                        Timestamp = activityPropertyCreated.Timestamp
+                    },
+                
+                    _ => new ActivityDto {
 
-                    ActivityType: activityPropertyCreated.Type,
-                    oldUserId: null,
-                    newUserId: null,
-                    createdIssueId: activityPropertyCreated.IssueId,
-                    updatedIssueId: null,
-                    createdCommentId: null,
-                    updatedCommentId: null,
-                    authorUserId: activityPropertyCreated.AuthorId,
-                    oldValue: null,
-                    newValue: null,
-                    Timestamp: activityPropertyCreated.Timestamp
+                    }
+                },
 
-                    ),
 
-                ActivityPropertyUpdated activityPropertyUpdated => new ActivityDto(
+                ActivityPropertyUpdated activityPropertyUpdated => activityPropertyUpdated.Type switch
+                {
+                    ActivityType.UPDATED_DESCRIPTION => new ActivityDto
+                    {
+                        ActivityType = activityPropertyUpdated.Type,
+                        IssueId = activityPropertyUpdated.IssueId,
+                        EventAuthorUserId = activityPropertyUpdated.userId,
+                        OldValue = activityPropertyUpdated.OldValue,
+                        NewValue = activityPropertyUpdated.NewValue,
+                        Timestamp = activityPropertyUpdated.Timestamp
 
-                    ActivityType: activityPropertyUpdated.Type,
-                    oldUserId: null,
-                    newUserId: null,
-                    createdIssueId: activityPropertyUpdated.IssueId,
-                    updatedIssueId: null,
-                    createdCommentId: null,
-                    updatedCommentId: null,
-                    authorUserId: null,
-                    oldValue: activityPropertyUpdated.OldValue,
-                    newValue: activityPropertyUpdated.NewValue,
-                    Timestamp: activityPropertyUpdated.Timestamp
-                    ),
+                    },
+                    ActivityType.UPDATED_STATUS => new ActivityDto
+                    { 
+                        ActivityType = activityPropertyUpdated.Type,
+                        IssueId = activityPropertyUpdated.IssueId,
+                        OldStatus = activityPropertyUpdated.OldValue != null ? Enum.Parse<IssueStatus>(activityPropertyUpdated.OldValue) : null,
+                        NewStatus = activityPropertyUpdated.NewValue != null ? Enum.Parse<IssueStatus>(activityPropertyUpdated.NewValue) : null,
+                        EventAuthorUserId = activityPropertyUpdated.userId,
+                        Timestamp = activityPropertyUpdated.Timestamp
 
-                _ => new ActivityDto(
+                    },
+                    ActivityType.UPDATED_PRIORITY => new ActivityDto
+                    {
+                        ActivityType = activityPropertyUpdated.Type,
+                        IssueId = activityPropertyUpdated.IssueId,
+                        OldPriority = activityPropertyUpdated.OldValue != null ? Enum.Parse<IssuePriority>(activityPropertyUpdated.OldValue) : null,
+                        NewPriority = activityPropertyUpdated.NewValue != null ? Enum.Parse<IssuePriority>(activityPropertyUpdated.NewValue) : null,
+                        EventAuthorUserId = activityPropertyUpdated.userId,
+                        Timestamp = activityPropertyUpdated.Timestamp
+                    },
+                    ActivityType.UPDATED_ASSIGNEE => new ActivityDto
+                    {
+                        ActivityType = activityPropertyUpdated.Type,
+                        IssueId = activityPropertyUpdated.IssueId,
+                        OldAssigneeId = activityPropertyUpdated.OldValue != null ? int.Parse(activityPropertyUpdated.OldValue) : null,
+                        NewAssigneeId = activityPropertyUpdated.NewValue != null ? int.Parse(activityPropertyUpdated.NewValue) : null,
+                        EventAuthorUserId = activityPropertyUpdated.userId,
+                        Timestamp = activityPropertyUpdated.Timestamp
+                    },
+                    ActivityType.UPDATED_DUEDATE => new ActivityDto
+                    {
+                        ActivityType = activityPropertyUpdated.Type,
+                        IssueId = activityPropertyUpdated.IssueId,
+                        OldDateTime = activityPropertyUpdated.OldValue != null ? DateTime.Parse(activityPropertyUpdated.OldValue) : null,
+                        NewDateTime = activityPropertyUpdated.NewValue != null ? DateTime.Parse(activityPropertyUpdated.NewValue) : null,
+                        EventAuthorUserId = activityPropertyUpdated.userId,
+                        Timestamp = activityPropertyUpdated.Timestamp
+                    },
+                    _ => new ActivityDto {
+                    }
+                }
 
-                   ActivityType: a.Type,
-                   oldUserId: null,
-                   newUserId: null,
-                   createdIssueId: null,
-                   updatedIssueId: null,
-                   createdCommentId: null,
-                   updatedCommentId: null,
-                   authorUserId: null,
-                   oldValue: null,
-                   newValue: null,
-                   Timestamp: a.Timestamp
-                   )
             };
         }
 
         public List<ActivityDto> EntityListToDtoList(ICollection<Activity> activities)
         {
-            _logger.LogInformation("Converting list of Activity entities to list of DTOs. Number of activities: {ActivityCount}", activities.Count);
+            _logger.LogInformation("Converting list of Activity entities to list of DTOs. Number of activities= {ActivityCount}", activities.Count);
             return activities.Select(EntityToDto).ToList();
         }
 

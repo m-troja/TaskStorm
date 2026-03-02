@@ -130,7 +130,7 @@ public class IssueService : IIssueService
             
             l.LogDebug($"Keystring {issue.Key.KeyString} for id {issue.Id} and IdInsideProject {issue.IdInsideProject}");
 
-            var activity = await _activityService.CreateActivityPropertyCreatedAsync(ActivityType.CREATED_ISSUE, issue.Id, issue.AuthorId);
+            var activity = await _activityService.CreateIssueAsync(ActivityType.CREATED_ISSUE, issue.Id, issue.AuthorId);
         }
         catch (System.Exception )
         {
@@ -219,6 +219,7 @@ public class IssueService : IIssueService
         l.LogDebug($"Assigning issue {req.IssueId} to user {req.AssigneeId}, event author={userId}");
         var newAssignee = await _db.Users.AnyAsync(u => u.Id == req.AssigneeId) ? await _userService.GetByIdAsync(req.AssigneeId) : throw new BadRequestException("Assignee user was not found") ;
         l.LogDebug($"Fetched new assignee: {newAssignee}");
+        
         var issue = await GetIssueFromDb(req.IssueId);
 
         User? oldAssignee;
@@ -228,7 +229,12 @@ public class IssueService : IIssueService
             l.LogDebug("Old assignee was null or 0, assigning to system user for activity log");
             oldAssignee = await _db.Users.FirstOrDefaultAsync(u => u.Id == SystemUserId);
         };
-        
+
+        if (oldAssignee == null) {
+            l.LogDebug("System user assignee was not found in database");
+            throw new ServerException("System user assignee was not found in database");
+        }
+
         issue.Assignee = newAssignee;
         issue.AssigneeId = newAssignee.Id;
         l.LogDebug($"Set assignee {issue.Assignee} for issue {issue.Id}");
@@ -236,7 +242,7 @@ public class IssueService : IIssueService
         Issue updatedIssue = await UpdateIssueAsync(issue);
         l.LogDebug($"Updated issue {updatedIssue.Id} in database");
 
-        var activity = await _activityService.CreateActivityPropertyUpdatedAsync(ActivityType.UPDATED_ASSIGNEE, (oldAssignee.Id).ToString(), (newAssignee.Id).ToString(), issue.Id, userId);
+        var activity = await _activityService.UpdateAssigneeAsync(ActivityType.UPDATED_ASSIGNEE, oldAssignee.Id, newAssignee.Id, issue.Id, userId);
         await _slackNotificationService.SendIssueAssignedNotificationAsync(issue);
         l.LogDebug($"Sent issue assigned notification for issue {issue.Id} to ChatGPT");
         return updatedIssue;
@@ -316,7 +322,7 @@ public class IssueService : IIssueService
         var UpdatedIssue = await UpdateIssueAsync(issue);
         IssueDto issueDto = _issueCnv.ConvertIssueToIssueDto(UpdatedIssue);
         
-        var activity = await _activityService.CreateActivityPropertyUpdatedAsync(ActivityType.UPDATED_STATUS, ((int)oldStatus).ToString(), ((int)issue.Status).ToString(), issue.Id, userId);
+        var activity = await _activityService.UpdateStatusAsync(ActivityType.UPDATED_STATUS, oldStatus, issue.Status, issue.Id, userId);
         await _slackNotificationService.SendIssueStatusChangedNotificationAsync(issue);
         return issueDto;
     }
@@ -335,12 +341,10 @@ public class IssueService : IIssueService
         issue.Priority = Enum.Parse<IssuePriority>(req.NewPriority);
         var UpdatedIssue = await UpdateIssueAsync(issue);
         IssueDto issueDto = _issueCnv.ConvertIssueToIssueDto(UpdatedIssue);
-        var activity = await _activityService.CreateActivityPropertyUpdatedAsync(
-            ActivityType.UPDATED_PRIORITY, 
-            oldPriority.HasValue ? ((int)oldPriority.Value).ToString() : "-1", 
-            ((int)issue.Priority).ToString(), 
-            issue.Id,
-            userId);
+    
+        var oldPriorityForActivity = oldPriority == null ? IssuePriority.NORMAL : oldPriority.Value;
+        var newPriorityForActivity = issue.Priority == null ? IssuePriority.NORMAL : issue.Priority.Value;
+        var activity = await _activityService.UpdatePriorityAsync(ActivityType.UPDATED_PRIORITY, oldPriorityForActivity, newPriorityForActivity, issue.Id, userId);
         await _slackNotificationService.SendIssuePriorityChangedNotificationAsync(issue);
         return issueDto;
     }
@@ -354,6 +358,9 @@ public class IssueService : IIssueService
         var UpdatedIssue = await UpdateIssueAsync(issue);
         IssueDto issueDto = _issueCnv.ConvertIssueToIssueDto(UpdatedIssue);
         l.LogDebug($"Assigned team {team.Name} to issue {issue.Id} successfully");
+
+        var oldTeamId = issue.TeamId.HasValue ? issue.TeamId.Value : -1;
+        var activity = await _activityService.UpdateTeamAsync(ActivityType.UPDATE_TEAM, oldTeamId,  team.Id, issue.Id, userId);
         return issueDto;
     }
 
