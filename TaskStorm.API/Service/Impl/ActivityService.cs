@@ -42,10 +42,10 @@ public class ActivityService : IActivityService
 
     }
 
-    public async Task<ActivityPropertyCreated> CreateCommenAsync(ActivityType Type, int issueId, int commentId)
+    public async Task<ActivityPropertyCreated> CreateCommenAsync(ActivityType Type, int issueId, int commentId, int EventAuthorId)
     {
         l.LogDebug($"Creating Comment Activity: Type={Type}, issueId={issueId}, commentId={commentId}");
-        var activity = new ActivityPropertyCreated(Type, issueId, commentId);
+        var activity = new ActivityPropertyCreated(Type, issueId, EventAuthorId) { CommentId = commentId};
         _db.Activities.Add(activity);
         await _db.SaveChangesAsync();
         return activity;

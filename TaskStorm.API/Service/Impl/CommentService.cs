@@ -22,7 +22,7 @@ public class CommentService : ICommentService
     private readonly ILogger<CommentService> logger;
     private readonly ISlackNotificationService _slackNotificationService;
     private readonly IActivityService _activityService;
-    public async Task<CommentDto> CreateCommentAsync(CreateCommentRequest req)
+    public async Task<CommentDto> CreateCommentAsync(CreateCommentRequest req, int userId)
     {
         var issue = await _issueService.GetIssueByIdAsync(req.IssueId);
         var user = await _userService.GetByIdAsync(req.AuthorId);
@@ -37,9 +37,9 @@ public class CommentService : ICommentService
         await _db.SaveChangesAsync();
         await _slackNotificationService.SendCommentAddedNotificationAsync(issue);
 
-        var activity = await _activityService.CreateCommenAsync(ActivityType.CREATED_COMMENT, issue.Id, comment.AuthorId);
+        var activity = await _activityService.CreateCommenAsync(ActivityType.CREATED_COMMENT, issue.Id, comment.Id,  userId);
         logger.LogInformation($"Created comment with Id={comment.Id} for IssueId={req.IssueId} by AuthorId={req.AuthorId}");
-        logger.LogInformation($"Created activity with Id={activity.Id} for CommentId={comment.Id} and IssueId={issue.Id}");
+        logger.LogInformation($"Created activity with Id={activity.Id} for CommentId={comment.Id} , IssueId={issue.Id}, userId={userId}");
         return _commentCnv.EntityToDto(comment);
     }
     public async Task<CommentDto> EditCommentAsync(EditCommentRequest req)

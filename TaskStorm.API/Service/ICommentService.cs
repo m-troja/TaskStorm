@@ -6,7 +6,7 @@ namespace TaskStorm.Service;
 
 public interface ICommentService
 {
-    Task<CommentDto> CreateCommentAsync(CreateCommentRequest ccr);
+    Task<CommentDto> CreateCommentAsync(CreateCommentRequest ccr, int userId);
     Task<CommentDto> EditCommentAsync(EditCommentRequest ccr);
     Task<IEnumerable<CommentDto>> GetCommentsByIssueIdAsync(int issueId);
     Task DeleteAllCommentsByIssueId(int issueId);

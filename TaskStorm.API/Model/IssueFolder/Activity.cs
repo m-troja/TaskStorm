@@ -17,6 +17,7 @@ public abstract class Activity
     protected Activity(ActivityType type, int IssueId
         )
     {
+        this.EventAuthorUserId = EventAuthorUserId;
         this.IssueId = IssueId;
         this.Type = type;
     }

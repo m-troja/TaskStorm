@@ -8,7 +8,7 @@ public interface IActivityService
     Task<List<Activity>> GetActivitiesByIssueIdAsync(int issueId);
     Task DeleteActivitiesForIssueId(int id);
     Task<ActivityPropertyCreated> CreateIssueAsync(ActivityType Type, int issueId, int creatorUserId);
-    Task<ActivityPropertyCreated> CreateCommenAsync(ActivityType Type, int issueId, int commentId);
+    Task<ActivityPropertyCreated> CreateCommenAsync(ActivityType Type, int issueId, int commentId, int EventAuthorId);
     Task<ActivityPropertyUpdated> CreateActivityPropertyUpdatedAsync(ActivityType Type, string OldValue, string NewValue, int issueId, int userId);
     Task<ActivityPropertyUpdated> UpdateStatusAsync(ActivityType Type, IssueStatus OldValue, IssueStatus NewValue, int issueId, int userId);
     Task<ActivityPropertyUpdated> UpdatePriorityAsync(ActivityType Type, IssuePriority OldValue, IssuePriority NewValue, int issueId, int userId);

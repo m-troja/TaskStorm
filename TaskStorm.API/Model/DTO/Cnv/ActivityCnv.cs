@@ -19,7 +19,7 @@ namespace TaskStorm.Model.DTO.Cnv
                     {
                         ActivityType = activityPropertyCreated.Type,
                         IssueId = activityPropertyCreated.IssueId,
-                        EventAuthorUserId = activityPropertyCreated.AuthorId,
+                        EventAuthorUserId = activityPropertyCreated.EventAuthorUserId,
                         Timestamp = activityPropertyCreated.Timestamp
                     },
                     ActivityType.CREATED_COMMENT => new ActivityDto
@@ -27,7 +27,7 @@ namespace TaskStorm.Model.DTO.Cnv
                         ActivityType = activityPropertyCreated.Type,
                         IssueId = activityPropertyCreated.IssueId,
                         CommentId = activityPropertyCreated.CommentId,
-                        EventAuthorUserId = activityPropertyCreated.AuthorId,
+                        EventAuthorUserId = activityPropertyCreated.EventAuthorUserId,
                         Timestamp = activityPropertyCreated.Timestamp
                     },
                 
@@ -43,7 +43,7 @@ namespace TaskStorm.Model.DTO.Cnv
                     {
                         ActivityType = activityPropertyUpdated.Type,
                         IssueId = activityPropertyUpdated.IssueId,
-                        EventAuthorUserId = activityPropertyUpdated.userId,
+                        EventAuthorUserId = activityPropertyUpdated.EventAuthorUserId,
                         OldValue = activityPropertyUpdated.OldValue,
                         NewValue = activityPropertyUpdated.NewValue,
                         Timestamp = activityPropertyUpdated.Timestamp
@@ -55,7 +55,7 @@ namespace TaskStorm.Model.DTO.Cnv
                         IssueId = activityPropertyUpdated.IssueId,
                         OldStatus = activityPropertyUpdated.OldValue != null ? Enum.Parse<IssueStatus>(activityPropertyUpdated.OldValue) : null,
                         NewStatus = activityPropertyUpdated.NewValue != null ? Enum.Parse<IssueStatus>(activityPropertyUpdated.NewValue) : null,
-                        EventAuthorUserId = activityPropertyUpdated.userId,
+                        EventAuthorUserId = activityPropertyUpdated.EventAuthorUserId,
                         Timestamp = activityPropertyUpdated.Timestamp
 
                     },
@@ -65,7 +65,7 @@ namespace TaskStorm.Model.DTO.Cnv
                         IssueId = activityPropertyUpdated.IssueId,
                         OldPriority = activityPropertyUpdated.OldValue != null ? Enum.Parse<IssuePriority>(activityPropertyUpdated.OldValue) : null,
                         NewPriority = activityPropertyUpdated.NewValue != null ? Enum.Parse<IssuePriority>(activityPropertyUpdated.NewValue) : null,
-                        EventAuthorUserId = activityPropertyUpdated.userId,
+                        EventAuthorUserId = activityPropertyUpdated.EventAuthorUserId,
                         Timestamp = activityPropertyUpdated.Timestamp
                     },
                     ActivityType.UPDATED_ASSIGNEE => new ActivityDto
@@ -74,7 +74,7 @@ namespace TaskStorm.Model.DTO.Cnv
                         IssueId = activityPropertyUpdated.IssueId,
                         OldAssigneeId = activityPropertyUpdated.OldValue != null ? int.Parse(activityPropertyUpdated.OldValue) : null,
                         NewAssigneeId = activityPropertyUpdated.NewValue != null ? int.Parse(activityPropertyUpdated.NewValue) : null,
-                        EventAuthorUserId = activityPropertyUpdated.userId,
+                        EventAuthorUserId = activityPropertyUpdated.EventAuthorUserId,
                         Timestamp = activityPropertyUpdated.Timestamp
                     },
                     ActivityType.UPDATED_DUEDATE => new ActivityDto
@@ -83,7 +83,16 @@ namespace TaskStorm.Model.DTO.Cnv
                         IssueId = activityPropertyUpdated.IssueId,
                         OldDateTime = activityPropertyUpdated.OldValue != null ? DateTime.Parse(activityPropertyUpdated.OldValue) : null,
                         NewDateTime = activityPropertyUpdated.NewValue != null ? DateTime.Parse(activityPropertyUpdated.NewValue) : null,
-                        EventAuthorUserId = activityPropertyUpdated.userId,
+                        EventAuthorUserId = activityPropertyUpdated.EventAuthorUserId,
+                        Timestamp = activityPropertyUpdated.Timestamp
+                    },
+                    ActivityType.UPDATE_TEAM => new ActivityDto
+                    {
+                        ActivityType = activityPropertyUpdated.Type,
+                        IssueId = activityPropertyUpdated.IssueId,
+                        OldTeamId = activityPropertyUpdated.OldValue != null ? int.Parse(activityPropertyUpdated.OldValue) : null,
+                        NewTeamId = activityPropertyUpdated.NewValue != null ? int.Parse(activityPropertyUpdated.NewValue) : null,
+                        EventAuthorUserId = activityPropertyUpdated.EventAuthorUserId,
                         Timestamp = activityPropertyUpdated.Timestamp
                     },
                     _ => new ActivityDto {

@@ -1,6 +1,7 @@
 ﻿using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Sprache;
+using System.Security.Claims;
 using TaskStorm.Model.DTO;
 using TaskStorm.Model.Request;
 using TaskStorm.Model.Response;
@@ -20,7 +21,9 @@ public class CommentController : ControllerBase
     [Route("create")]   
     public async Task<ActionResult<CommentDto>> CreateComment([FromBody] CreateCommentRequest cmr)
     {
-        var dto = await _cs.CreateCommentAsync(cmr);
+        int userId = int.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
+
+        var dto = await _cs.CreateCommentAsync(cmr, userId);
         return Ok(dto);
     }
 
