@@ -9,5 +9,6 @@ public interface IActivityService
     Task DeleteActivitiesForIssueId(int id);
     public Task<ActivityPropertyUpdated> CreateActivityPropertyUpdatedAsync(ActivityType Type, string OldValue, string NewValue, int issueId, int userId);
     public Task<ActivityPropertyCreated> CreateActivityPropertyCreatedAsync(ActivityType Type, int issueId);
+    public Task<ActivityPropertyCreated> AddCommentAsync(ActivityType Type, int issueId);
 
 }
