@@ -359,6 +359,7 @@ public class IssueService : IIssueService
         
         var activity = await _activityService.UpdateStatusAsync(oldStatus, issue.Status, issue.Id, userId);
         await _slackNotificationService.SendIssueStatusChangedNotificationAsync(issue, eventAuthorUser);
+
         return issueDto;
     }
 

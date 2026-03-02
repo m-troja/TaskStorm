@@ -1,8 +1,6 @@
 ﻿using TaskStorm.Model.Entity;
 using TaskStorm.Model.IssueFolder;
 
-namespace TaskStorm.Service;
-
 public interface IActivityService
 {
     Task<List<Activity>> GetActivitiesByIssueIdAsync(int issueId);
@@ -17,4 +15,12 @@ public interface IActivityService
     Task<ActivityPropertyUpdated> UpdateDescriptionAsync(string OldValue, string NewValue, int issueId, int userId);
     Task<ActivityPropertyUpdated> UpdateTitleAsync(string OldValue, string NewValue, int issueId, int userId);
 
+    Task<ActivityPropertyCreated> CreateActivityPropertyCreatedAsync(
+        ActivityType Type,
+        int issueId,
+        int authorId);
+
+    Task<List<Activity>> GetActivitiesByIssueIdAsync(int issueId);
+
+    Task DeleteActivitiesForIssueId(int id);
 }
