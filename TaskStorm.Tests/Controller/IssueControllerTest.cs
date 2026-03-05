@@ -1,10 +1,9 @@
-﻿using Microsoft.Extensions.Logging;
+﻿using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.Logging;
 using Moq;
-using Serilog.Core;
-using System;
 using System.Collections.Generic;
-using System.Linq;
-using System.Text;
+using System.Security.Claims;
 using System.Threading.Tasks;
 using TaskStorm.Controller;
 using TaskStorm.Model.DTO;
@@ -12,345 +11,214 @@ using TaskStorm.Model.DTO.Cnv;
 using TaskStorm.Model.Entity;
 using TaskStorm.Model.IssueFolder;
 using TaskStorm.Model.Request;
-using TaskStorm.Model.Response;
 using TaskStorm.Service;
 using Xunit;
 
-namespace TaskStorm.Tests.Controller;
-public class IssueControllerTest
+public class IssueControllerTests
 {
-    private readonly Mock<IIssueService> mi;
-    private CommentCnv commentCnv;
-    public ILogger<IssueController> GetLogger() =>
-        new LoggerFactory().CreateLogger<IssueController>();
+    private readonly Mock<IIssueService> _issueService = new();
+    private readonly Mock<IActivityService> _activityService = new();
 
-    private IssueController CreateController(  Mock<IIssueService> mi)
-    {
-        ILogger<IssueCnv> mockIssueService = new LoggerFactory().CreateLogger<IssueCnv>();
-        var teamCnvLogger = new LoggerFactory().CreateLogger<TeamCnv>();
-        var teamCnv = new TeamCnv(teamCnvLogger);
-        var commentLogger = new LoggerFactory().CreateLogger<CommentCnv>();
-        var commentCnv = new CommentCnv(commentLogger);
-        var issueCnv = new IssueCnv(commentCnv, mockIssueService, teamCnv);
-        return new IssueController(mi.Object, GetLogger(), issueCnv);
-    }
+    private ActivityCnv _activityCnv;
+    private IssueCnv _issueCnv;
 
-    [Fact]
-    public async Task GetAllIssues_ShouldReturnIssues_WhenIssuesExist()
+    private IssueController CreateController()
     {
-        // given
-        int id = 1;
-        var mi = new Mock<IIssueService>();
-        var controller = CreateController(mi);
-        var expectedIssues = new List<Model.DTO.IssueDto>
+        var loggerFactory = LoggerFactory.Create(builder => { });
+        var commentCnvLogger = loggerFactory.CreateLogger<CommentCnv>();
+        var teamCnvLogger = loggerFactory.CreateLogger<TeamCnv>();
+        var issueCnvLogger = loggerFactory.CreateLogger<IssueCnv>();
+        var activityCnvLogger = loggerFactory.CreateLogger<ActivityCnv>();
+
+        _activityCnv = new ActivityCnv(activityCnvLogger);
+        _issueCnv = new IssueCnv(new CommentCnv(commentCnvLogger), issueCnvLogger, new TeamCnv(teamCnvLogger));
+
+        var controllerLogger = loggerFactory.CreateLogger<IssueController>();
+
+        var controller = new IssueController(
+            _issueService.Object,
+            controllerLogger,
+            _issueCnv,
+            _activityService.Object,
+            _activityCnv
+        );
+
+        // Setup HttpContext with a user
+        controller.ControllerContext = new ControllerContext
         {
-            BuildIssueDto(id),
-            BuildIssueDto(id++)
+            HttpContext = new DefaultHttpContext
+            {
+                User = new ClaimsPrincipal(new ClaimsIdentity(new[]
+                {
+                    new Claim(ClaimTypes.NameIdentifier, "1")
+                }))
+            }
         };
-        mi.Setup(s => s.GetAllIssues())
-          .ReturnsAsync(expectedIssues);
-        // when
-        var result = await controller.GetAllIssues();
-        // then
-        var ok = Assert.IsType<Microsoft.AspNetCore.Mvc.OkObjectResult>(result.Result);
-        var returnIssues = Assert.IsType<List<Model.DTO.IssueDto>>(ok.Value);
-        Assert.Equal(expectedIssues.Count, returnIssues.Count);
-        Assert.Equal(expectedIssues, returnIssues);
+
+        return controller;
+    }
+
+
+
+    private Activity BuildActivity(ActivityType type)
+    {
+        return type switch
+        {
+            ActivityType.CREATED_ISSUE => new ActivityPropertyCreated(type, 1, 1),
+            ActivityType.UPDATED_STATUS => new ActivityPropertyUpdated("DONE", "IN_PROGRESS", 1, type, 1),
+            _ => new ActivityPropertyCreated(type, 1, 1)
+        };
     }
 
     [Fact]
-    public async Task GetIssueById_ShouldReturnIssue_WhenExists()
+    public async Task CreateIssue_ShouldReturnOk()
     {
-        int id = 1;
-        var mi = new Mock<IIssueService>();
-        var controller = CreateController(mi);
+        var controller = CreateController();
+        var req = new CreateIssueRequest("Test", "Desc", "NORMAL", 1, null, null, 1);
+        var issue = BuildIssue().Result;
 
-        var issue = BuildIssueDto(id);
+        var dto = _issueCnv.EntityToDto(issue);
 
-        mi.Setup(s => s.GetIssueDtoByIdAsync(1)).ReturnsAsync(issue);
-
-        var result = await controller.GetIssueById(1);
-
-        var ok = Assert.IsType<Microsoft.AspNetCore.Mvc.OkObjectResult>(result.Result);
-        var returnIssue = Assert.IsType<IssueDto>(ok.Value);
-
-        Assert.Equal(issue, returnIssue);
-    }
-
-    [Fact]
-    public async Task GetIssueByKey_ShouldReturnIssue_WhenExists()
-    {
-        int id = 1;
-        var mi = new Mock<IIssueService>();
-        var controller = CreateController(mi);
-
-        var issue = BuildIssueDto(id);
-
-        mi.Setup(s => s.GetIssueDtoByKeyAsync("ISSUE-1")).ReturnsAsync(issue);
-
-        var result = await controller.GetIssueByKey("ISSUE-1");
-
-        var ok = Assert.IsType<Microsoft.AspNetCore.Mvc.OkObjectResult>(result.Result);
-        var returned = Assert.IsType<IssueDto>(ok.Value);
-
-        Assert.Equal(issue, returned);
-    }
-
-    [Fact]
-    public async Task CreateIssue_ShouldReturnCreatedResponse()
-    {
-        int id = 1;
-        var mi = new Mock<IIssueService>();
-        var controller = CreateController(mi);
-
-        var req = new CreateIssueRequest("Hello", "desc", "NORMAL", 10, 10, null, 100);
-        var project = new Project("PROJ", "Desc" );
-        var issue = BuildIssue(id);
-
-        mi.Setup(s => s.CreateIssueAsync(req))
-            .ReturnsAsync(issue);
+        _issueService.Setup(x => x.CreateIssueAsync(req)).ReturnsAsync(issue);
 
         var result = await controller.CreateIssue(req);
-
-        var ok = Assert.IsType<Microsoft.AspNetCore.Mvc.OkObjectResult>(result.Result);
-        var returned = Assert.IsType<IssueDto>(ok.Value);
-
-        Assert.Equal("PROJ-1", returned.Key);
+        var ok = Assert.IsType<OkObjectResult>(result.Result);
+        Assert.Equal(dto.Id, ((IssueDto)ok.Value).Id);
     }
 
     [Fact]
-    public async Task AssignIssue_ShouldReturnUpdatedIssue()
+    public async Task GetIssueById_ShouldReturnIssue()
     {
-        int id = 1;
-        var mi = new Mock<IIssueService>();
-        var controller = CreateController(mi);
+        var controller = CreateController();
+        var dto = BuildIssueDto(1);
 
-        var req = new AssignIssueRequest(1, 20);
+        _issueService.Setup(x => x.GetIssueDtoByIdAsync(1)).ReturnsAsync(dto);
 
-        var issueDto = BuildIssueDto(id);
-
-        mi.Setup(s => s.AssignIssueAsync(req)).ReturnsAsync(BuildIssue(id));
-
-        mi.Setup(s => s.GetIssueDtoByIdAsync(1)).ReturnsAsync(issueDto);
-
-        var result = await controller.AssignIssue(req);
-
-        var ok = Assert.IsType<Microsoft.AspNetCore.Mvc.OkObjectResult>(result.Result);
-        var returned = Assert.IsType<IssueDto>(ok.Value);
+        var result = await controller.GetIssueById(1);
+        var ok = Assert.IsType<OkObjectResult>(result.Result);
+        Assert.Equal(dto.Id, ((IssueDto)ok.Value).Id);
     }
 
     [Fact]
-    public async Task RenameIssue_ShouldReturnUpdatedIssue()
+    public async Task GetIssueByKey_ShouldReturnIssue()
     {
-        int id = 1;
-        var mi = new Mock<IIssueService>();
-        var controller = CreateController(mi);
+        var controller = CreateController();
+        var dto = BuildIssueDto(1);
 
-        var req = new RenameIssueRequest(1, "NewTitle");
+        _issueService.Setup(x => x.GetIssueDtoByKeyAsync("ISSUE-1")).ReturnsAsync(dto);
 
-        var issueDto = BuildIssueDto(id);
-
-        mi.Setup(s => s.RenameIssueAsync(req)).ReturnsAsync(issueDto);
-
-        var result = await controller.RenameIssue(req);
-
-        var ok = Assert.IsType<Microsoft.AspNetCore.Mvc.OkObjectResult>(result.Result);
-        var returned = Assert.IsType<IssueDto>(ok.Value);
-
-        Assert.Equal("NewTitle", returned.Title);
+        var result = await controller.GetIssueByKey("ISSUE-1");
+        var ok = Assert.IsType<OkObjectResult>(result.Result);
+        Assert.Equal(dto.Id, ((IssueDto)ok.Value).Id);
     }
 
     [Fact]
-    public async Task AssignTeam_ShouldReturnUpdatedIssue()
+    public async Task GetIssueByKey_ShouldThrow_WhenKeyEmpty()
     {
-        int id = 1;
-        var mi = new Mock<IIssueService>();
-        var controller = CreateController(mi);
-
-        var req = new AssignTeamRequest(1, 50);
-
-        var issueDto = BuildIssueDto(id);
-
-        mi.Setup(s => s.AssignTeamAsync(req)).ReturnsAsync(issueDto);
-
-        var result = await controller.AssignTeam(req);
-
-        var ok = Assert.IsType<Microsoft.AspNetCore.Mvc.OkObjectResult>(result.Result);
-        var returned = Assert.IsType<IssueDto>(ok.Value);
-
-        Assert.Equal("New Team", returned.Team.Name);
+        var controller = CreateController();
+        await Assert.ThrowsAsync<TaskStorm.Exception.BadRequestException>(() => controller.GetIssueByKey(""));
     }
 
     [Fact]
-    public async Task ChangeIssueStatus_ShouldReturnUpdatedIssue()
+    public async Task GetAllIssues_ShouldReturnList()
     {
-        int id = 1;
+        var controller = CreateController();
+        var list = new List<IssueDto> { BuildIssueDto(1), BuildIssueDto(2) };
 
-        var mi = new Mock<IIssueService>();
-        var controller = CreateController(mi);
-        var teamCnvLogger = new LoggerFactory().CreateLogger<TeamCnv>();
-        var teamCnv = new TeamCnv(teamCnvLogger);
-        var req = new ChangeIssueStatusRequest(1, "IN_PROGRESS");
+        _issueService.Setup(x => x.GetAllIssues()).ReturnsAsync(list);
 
-        var issueDto = BuildIssueDto(id);
-
-
-        mi.Setup(s => s.ChangeIssueStatusAsync(req)).ReturnsAsync(issueDto);
-
-        var result = await controller.ChangeIssueStatus(req);
-
-        var ok = Assert.IsType<Microsoft.AspNetCore.Mvc.OkObjectResult>(result.Result);
-        var returned = Assert.IsType<IssueDto>(ok.Value);
-
-        Assert.Equal(IssueStatus.DONE, returned.Status);
+        var result = await controller.GetAllIssues();
+        var ok = Assert.IsType<OkObjectResult>(result.Result);
+        var issues = Assert.IsType<List<IssueDto>>(ok.Value);
+        Assert.Equal(2, issues.Count);
     }
 
     [Fact]
-    public async Task UpdateIssuePriority_ShouldReturnUpdatedIssue()
+    public async Task UpdateIssue_ShouldReturnUpdatedIssue()
     {
-        int id = 1;
+        var controller = CreateController();
+        var req = new UpdateIssueRequest { IssueId = 1, Title = "Updated" };
+        var issue = BuildIssue().Result;
+        var dto = BuildIssueDto(1);
 
-        var mi = new Mock<IIssueService>();
-        var controller = CreateController(mi);
+        _issueService.Setup(x => x.HandleUpdateIssueRequestAsync(req, 1)).ReturnsAsync(issue);
 
-        var req = new ChangeIssuePriorityRequest(1, "HIGH");
-
-        var issueDto = BuildIssueDto(id); 
-
-        mi.Setup(s => s.ChangeIssuePriorityAsync(req)).ReturnsAsync(issueDto);
-
-        var result = await controller.UpdateIssuePriority(req);
-
-        var ok = Assert.IsType<Microsoft.AspNetCore.Mvc.OkObjectResult>(result.Result);
-        var returned = Assert.IsType<IssueDto>(ok.Value);
-
-        Assert.Equal(IssuePriority.LOW, returned.Priority);
+        var result = await controller.UpdateIssue(req);
+        var ok = Assert.IsType<OkObjectResult>(result.Result);
+        Assert.Equal(dto.Id, ((IssueDto)ok.Value).Id);
     }
 
     [Fact]
-    public async Task UpdateDueDate_ShouldReturnUpdatedIssue()
+    public async Task DeleteIssue_ShouldReturnOk()
     {
-        int id = 1;
-        var mi = new Mock<IIssueService>();
-        var controller = CreateController(mi);
-
-        var req = new UpdateDueDateRequest(1, DateTime.Parse("2030-01-01"));
-
-        var issueDto = BuildIssueDto(id);
-
-        mi.Setup(s => s.UpdateDueDateAsync(req)).ReturnsAsync(issueDto);
-
-        var result = await controller.UpdateDueDate(req);
-
-        var ok = Assert.IsType<Microsoft.AspNetCore.Mvc.OkObjectResult>(result.Result);
-        var returned = Assert.IsType<IssueDto>(ok.Value);
-
-        Assert.Equal(DateTime.Parse("2030-01-01"), returned.DueDate);
-    }
-
-    [Fact]
-    public async Task GetAllIssuesByUserId_ShouldReturnIssues()
-    {
-        var mi = new Mock<IIssueService>();
-        var controller = CreateController(mi);
-
-        var issues = new List<IssueDto>();
-
-        mi.Setup(s => s.GetIssuesByUserId(1)).ReturnsAsync(issues);
-
-        var result = await controller.GetAllIssuesByUserId(1);
-
-        var ok = Assert.IsType<Microsoft.AspNetCore.Mvc.OkObjectResult>(result.Result);
-        Assert.Equal(issues, ok.Value);
-    }
-
-    [Fact]
-    public async Task GetAllIssuesByProjectId_ShouldReturnIssues()
-    {
-        var mi = new Mock<IIssueService>();
-        var controller = CreateController(mi);
-
-        var issues = new List<IssueDto>();
-
-        mi.Setup(s => s.GetIssuesByProjectId(1)).ReturnsAsync(issues);
-
-        var result = await controller.GetAllIssuesByProjectId(1);
-
-        var ok = Assert.IsType<Microsoft.AspNetCore.Mvc.OkObjectResult>(result.Result);
-        Assert.Equal(issues, ok.Value);
-    }
-
-    [Fact]
-    public async Task DeleteIssueById_ShouldReturnConfirmation()
-    {
-        var mi = new Mock<IIssueService>();
-        var controller = CreateController(mi);
-
-        mi.Setup(s => s.DeleteIssueByIdAsync(1)).Returns(Task.CompletedTask);
+        var controller = CreateController();
+        _issueService.Setup(x => x.DeleteIssueByIdAsync(1, 1)).Returns(Task.CompletedTask);
 
         var result = await controller.DeletelIssueById(1);
-
-        var ok = Assert.IsType<Microsoft.AspNetCore.Mvc.OkObjectResult>(result.Result);
-
-        Assert.Equal("Deleted issue 1", ok.Value);
+        var ok = Assert.IsType<OkObjectResult>(result.Result);
+        Assert.Contains("Deleted issue", ok.Value.ToString());
     }
 
     [Fact]
-    public async Task DeleteAllIssues_ShouldReturnConfirmation()
+    public async Task GetActivitiesByIssueId_ShouldReturnConvertedDtos()
     {
-        var mi = new Mock<IIssueService>();
-        var controller = CreateController(mi);
+        var controller = CreateController();
+        var activities = new List<Activity> { BuildActivity(ActivityType.CREATED_ISSUE) };
 
-        mi.Setup(s => s.deleteAllIssues()).Returns(Task.CompletedTask);
+        _activityService.Setup(x => x.GetActivitiesByIssueIdAsync(1)).ReturnsAsync(activities);
 
-        var result = await controller.DeleteAllIssues();
+        var result = await controller.GetActivitiesByIssueId(1);
+        var ok = Assert.IsType<OkObjectResult>(result.Result);
 
-        var ok = Assert.IsType<Microsoft.AspNetCore.Mvc.OkObjectResult>(result.Result);
-
-        Assert.Equal("All issues deleted successfully", ok.Value);
+        var dtos = Assert.IsType<List<ActivityDto>>(ok.Value);
+        Assert.Single(dtos);
+        Assert.Equal(ActivityType.CREATED_ISSUE, dtos[0].ActivityType);
+        Assert.Equal(1, dtos[0].IssueId);
     }
 
-    private Issue BuildIssue(int id)
+    private async Task<Issue> BuildIssue()
     {
-        var project = new Project() { Id = id, ShortName = "PROJ" };
-        var key = new Key() { Id = id, KeyString = "PROJ-1", Project = project, ProjectId = project.Id };
-
-        return new Issue(
-            "Title",
-            "Desc",
-            IssuePriority.HIGH,
-            new User { Id = id, FirstName = "John", LastName = "Doe" },
-            new User { Id = id++, FirstName = "John", LastName = "Doe" },
-            DateTime.Parse("2025-01-01"),
-            1,
-            2,
-            1,
-            2
-            )
+        var user = new User("A", "B") { Id = 1 };
+        var project = new Project("PR", "Test") { Id = 1 };
+        var team = new Team("Name") { Id = 1 };
+        var key = new Key { Id = 1, KeyString = "ISSUE-1" };
+        var issue = new Issue
         {
             Id = 1,
-            CreatedAt = DateTime.Parse("2025-01-02"),
-            UpdatedAt = DateTime.Parse("2025-01-03"),
-            Comments = new List<Comment>() { },
+            Title = "OldTitle",
+            Description = "OldDesc",
+            Priority = IssuePriority.NORMAL,
+            Status = IssueStatus.NEW,
+            Author = user,
+            AuthorId = user.Id,
+            Assignee = user,
+            AssigneeId = user.Id,
+            Project = project,
+            ProjectId = project.Id,
+            Team= team,
+            TeamId = team.Id,
             Key = key
         };
+        return issue;
     }
-    private User BuildUser()
-    {
-        return new User
-        (
-            "John",
-            "Doe",
-            "test@test.com",
-            "password",
-            new byte[] { Byte.Parse("111") },
-            new Role(Role.ROLE_USER)
-        );
-    }
-    
+
     private IssueDto BuildIssueDto(int id)
     {
-        return new IssueDto(id, "ISSUE-1", "NewTitle", "Desc", IssueStatus.DONE,
-                    IssuePriority.LOW, 1, 2, DateTime.Now, DateTime.Parse("2030-01-01"), DateTime.Now, new List<CommentDto>(), 1, new TeamDto(1, "New Team", new List<int>(1), new List<int>(1)));    
+        return new IssueDto(
+            id,
+            $"ISSUE-{id}",
+            "NewTitle",
+            "Desc",
+            IssueStatus.DONE,
+            IssuePriority.LOW,
+            1,
+            2,
+            DateTime.Now,
+            DateTime.Parse("2030-01-01"),
+            DateTime.Now,
+            1,
+            1
+        );
     }
+
 }

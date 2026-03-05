@@ -1,8 +1,11 @@
-﻿using Microsoft.Extensions.Logging;
+﻿using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.Logging;
 using Moq;
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Security.Claims;
 using TaskStorm.Controller;
 using TaskStorm.Model.DTO;
 using TaskStorm.Model.DTO.Cnv;
@@ -21,16 +24,8 @@ public class ChatGptControllerTest
     private readonly CommentCnv _commentCnv;
     private readonly IssueCnv _issueCnv;
     private readonly TeamCnv _teamCnv;
+    private readonly ChatGptController _controller;
 
-    private ChatGptController CreateController()
-    {
-       return new ChatGptController(
-           _userMock.Object,
-            LoggerFactory.Create(b => { }).CreateLogger<ChatGptController>(),
-            _issueMock.Object,
-            _issueCnv
-        );
-    }
     public ChatGptControllerTest()
     {
         var loggerFactory = LoggerFactory.Create(b => { });
@@ -42,20 +37,24 @@ public class ChatGptControllerTest
             loggerFactory.CreateLogger<IssueCnv>(),
             _teamCnv
         );
+        _controller = new ChatGptController(
+            _userMock.Object,
+            loggerFactory.CreateLogger<ChatGptController>(),
+            _issueMock.Object,
+            _issueCnv
+        );
     }
+
     [Fact]
     public async Task GetUserBySlackUserId_ShouldReturnUserDto_WhenUserExists()
     {
-        // given
-        var controller = CreateController();
-
         var slackUserId = "U12345678";
         var expectedUserDto = BuildUserDto(slackUserId);
         _userMock.Setup(service => service.GetUserBySlackUserIdAsync(slackUserId))
             .ReturnsAsync(expectedUserDto);
         
         // when
-        var result = await controller.GetUserBySlackUserId(slackUserId);
+        var result = await _controller.GetUserBySlackUserId(slackUserId);
 
         // then
         Assert.Equal(expectedUserDto, result);
@@ -65,13 +64,12 @@ public class ChatGptControllerTest
     public async Task CreateIssueBySlack_ShouldCreateIssue()
     {
         // given
-        var controller = CreateController();
         var req = BuildSlackCreateIssueRequest();
         var expectedIssueDto = BuildIssueDtoChatGpt(req);
         _issueMock.Setup(service => service.CreateIssueBySlackAsync(req)).ReturnsAsync(expectedIssueDto);
 
         // when
-        var result = await controller.CreateIssueBySlack(req);
+        var result = await _controller.CreateIssueBySlack(req);
 
         // then
         Assert.Equal(expectedIssueDto, result);
@@ -80,16 +78,16 @@ public class ChatGptControllerTest
     [Fact]
     public async Task AssignIssueByChatGpt_ShouldReturnAssignedDto()
     {
-        // given
-        var controller = CreateController();
+        SetUser(1, Role.ROLE_ADMIN);
+
         var req = new AssignIssueRequestChatGpt("PROJ-1", "U12345678");
         var expectedIssue = BuildIssue(req);
         var expectedConvertedIssue = _issueCnv.EntityToIssueDtoChatGpt(expectedIssue);
 
-        _issueMock.Setup(service => service.AssignIssueBySlackAsync(req)).ReturnsAsync(expectedIssue);
+        _issueMock.Setup(service => service.AssignIssueBySlackAsync(req, 1)).ReturnsAsync(expectedIssue);
 
         // when
-        var result = await controller.AssignIssueByChatGpt(req);
+        var result = await _controller.AssignIssueByChatGpt(req);
 
         // then
         Assert.Equal(expectedConvertedIssue.Id, result.Id);
@@ -143,7 +141,8 @@ public class ChatGptControllerTest
             req.dueDate != null ? DateTime.Parse(req.dueDate) : null,
             DateTime.Parse("2025-01-01"),
             new List<CommentDto>(),
-            1
+            1,
+            "TeamName"
             );
     }
 
@@ -169,6 +168,23 @@ public class ChatGptControllerTest
         UpdatedAt = DateTime.Parse("2025-01-03"),
         Comments = new List<Comment>() { } ,
         Key = key
+        };
+    }
+
+    private void SetUser(int id, string role)
+    {
+        var claims = new List<Claim>
+    {
+        new Claim(ClaimTypes.NameIdentifier, id.ToString()),
+        new Claim(ClaimTypes.Role, role)
+    };
+
+        var identity = new ClaimsIdentity(claims);
+        var principal = new ClaimsPrincipal(identity);
+
+        _controller.ControllerContext = new ControllerContext
+        {
+            HttpContext = new DefaultHttpContext { User = principal }
         };
     }
 

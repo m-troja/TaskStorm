@@ -13,11 +13,6 @@ public class IssueCnv
 
     public IssueDto EntityToDto(Issue Issue)
     {
-        ICollection<CommentDto> commentDtos = _commentCnv.EntityListToDtoList(Issue.Comments);
-        TeamDto teamDto = Issue.Team is not null
-            ? teamCnv.ConvertTeamToTeamDto(Issue.Team)
-            : new TeamDto(-1, "", new List<int>(), new List<int>());
-
         var issueDto = new IssueDto(
             Issue.Id,
                 Issue.Key.KeyString,
@@ -30,9 +25,8 @@ public class IssueCnv
                 Issue.CreatedAt,
                 Issue.DueDate,
                 Issue.UpdatedAt,
-                commentDtos,
                 Issue.ProjectId,
-                teamDto
+                Issue.TeamId ?? -1
             );
         
         return issueDto;

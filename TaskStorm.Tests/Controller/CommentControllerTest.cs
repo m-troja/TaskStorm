@@ -1,8 +1,11 @@
-﻿using Microsoft.AspNetCore.Mvc;
+﻿using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Logging;
 using Moq;
+using System.Security.Claims;
 using TaskStorm.Controller;
 using TaskStorm.Model.DTO;
+using TaskStorm.Model.Entity;
 using TaskStorm.Model.Request;
 using TaskStorm.Service;
 using Xunit;
@@ -11,24 +14,20 @@ namespace TaskStorm.Tests.Controller;
 public class CommentControllerTest
 {
     private readonly Mock<ICommentService> mc;
+    private readonly CommentController _controller;
 
     public ILogger<CommentController> GetLogger() =>
         new LoggerFactory().CreateLogger<CommentController>();
 
-    private CommentController CreateController(
-        Mock<ICommentService> mc)
+    public CommentControllerTest()
     {
         mc = new Mock<ICommentService>();
-        return new CommentController(mc.Object, GetLogger());
+        _controller =  new CommentController(mc.Object, GetLogger());
     }
 
     [Fact]
     public async Task GetCommentsByIssueId_ShouldReturnComments_WhenCommentsExist()
     {
-        // given
-        var mc = new Mock<ICommentService>();
-        var controller = new CommentController(mc.Object, GetLogger());
-
         var issueId = 1;
 
         var expectedComments = new List<CommentDto>
@@ -41,7 +40,7 @@ public class CommentControllerTest
           .ReturnsAsync(expectedComments);
 
         // when
-        var result = await controller.GetCommentsByIssueId(issueId);
+        var result = await _controller.GetCommentsByIssueId(issueId);
 
         // then
         var ok = Assert.IsType<OkObjectResult>(result.Result);
@@ -55,15 +54,13 @@ public class CommentControllerTest
     public async Task DeleteCommentById_ShouldDeleteComment()
     {
         // given
-        var mc = new Mock<ICommentService>();
-        var controller = new CommentController(mc.Object, GetLogger());
         var commentId = 1;
         mc.Setup(s => s.DeleteCommentById(commentId))
           .Returns(Task.CompletedTask)
           .Verifiable();
         
         // when
-        var result = await controller.DeleteCommentById(commentId);
+        var result = await _controller.DeleteCommentById(commentId);
         
         // then
         var ok = Assert.IsType<OkObjectResult>(result.Result);
@@ -93,22 +90,21 @@ public class CommentControllerTest
     [Fact]
     public async Task CreateComment_ShouldCreateComment()
     {
-        // given
-        var mc = new Mock<ICommentService>();
-        var controller = new CommentController(mc.Object, GetLogger());
+        SetUser(1, Role.ROLE_ADMIN);
+
         var createRequest = new CreateCommentRequest("Content", 1, 1);
         var expectedDto = GetCommentDto(1);
 
-        mc.Setup(s => s.CreateCommentAsync(createRequest))
+        mc.Setup(s => s.CreateCommentAsync(createRequest, 1))
           .ReturnsAsync(expectedDto)
           .Verifiable();
         
         // when
-        var result = await controller.CreateComment(createRequest);
+        var result = await _controller.CreateComment(createRequest);
         
         // then
         var ok = Assert.IsType<OkObjectResult>(result.Result);
-        mc.Verify(s => s.CreateCommentAsync(createRequest), Times.Once);
+        mc.Verify(s => s.CreateCommentAsync(createRequest, 1), Times.Once);
     }
 
     //private Comment GetComment(int id)
@@ -122,5 +118,22 @@ public class CommentControllerTest
         var attachmentIds = new List<int> { 1, 2, 3 };
         return new CommentDto(id, 1, "content" + " " + id.ToString(), 1, DateTime.Parse("2026-02-01"), DateTime.Parse("2026-02-01"), "FirstName LastName",
             attachmentIds, "U123");
+    }
+
+    private void SetUser(int id, string role)
+    {
+        var claims = new List<Claim>
+    {
+        new Claim(ClaimTypes.NameIdentifier, id.ToString()),
+        new Claim(ClaimTypes.Role, role)
+    };
+
+        var identity = new ClaimsIdentity(claims);
+        var principal = new ClaimsPrincipal(identity);
+
+        _controller.ControllerContext = new ControllerContext
+        {
+            HttpContext = new DefaultHttpContext { User = principal }
+        };
     }
 }

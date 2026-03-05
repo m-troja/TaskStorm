@@ -42,11 +42,12 @@ public class IssueService : IIssueService
 
     public async Task<Issue> CreateIssueAsync(CreateIssueRequest req)
     {
-        l.LogDebug($"Starting new issue creation for authorId: {req.authorId}, projectId: {req.projectId}");
+        l.LogDebug($"Starting new issue creation for authorId: {req.AuthorId}, projectId: {req.ProjectId}");
 
         await createSystemUserId();
 
         var issue = await ValidateCreateIssueRequest(req);
+        issue.Status = IssueStatus.NEW;
 
         using var transaction = await _db.Database.BeginTransactionAsync();
        
@@ -88,25 +89,25 @@ public class IssueService : IIssueService
     private async Task<Issue> ValidateCreateIssueRequest(CreateIssueRequest req)
     {
         // Project
-        Project project = await ValidateProjectAsync(req.projectId);
+        Project project = await ValidateProjectAsync(req.ProjectId);
 
         // Due Date
-        DateTime? dueDateUtc = await ValidateDueDateAsync(req.dueDate ?? "2026-01-01");
+        DateTime? dueDateUtc = await ValidateDueDateAsync(req.DueDate ?? "2026-01-01");
 
         // Priority
-        IssuePriority priorityToSet = await ValidatePriority(req.priority ?? "NORMAL");
+        IssuePriority priorityToSet = await ValidatePriority(req.Priority ?? "NORMAL");
 
         // Author 
-        User author = await GetUserByIdAsync(req.authorId);
+        User author = await GetUserByIdAsync(req.AuthorId);
 
         // Assignee
-        User? assignee = await GetUserByIdAsync(req.assigneeId ?? SystemUserId);
+        User? assignee = await GetUserByIdAsync(req.AssigneeId ?? SystemUserId);
 
         // Title
-        string title = await ValidateTitleAsync(req.title);
+        string title = await ValidateTitleAsync(req.Title);
 
         // Description
-        string description = await ValidateDescriptionAsync(req.description ?? "");
+        string description = await ValidateDescriptionAsync(req.Description ?? "");
 
         // Issue object
         var issueValidated = new Issue
@@ -566,7 +567,9 @@ public class IssueService : IIssueService
         }
 
 
-        await _db.Database.ExecuteSqlRawAsync("DELETE FROM Issues WHERE id = {0}", id);
+         _db.Issues.Remove(issue);
+        await _db.SaveChangesAsync();
+        
         l.LogInformation($"Deleted issue where Id={id}");
         await _slackNotificationService.SendIssueDeletedNotificationAsync(issue, author);
         l.LogInformation($"Sent issue deleted notification for issue ID {id} to ChatGPT");

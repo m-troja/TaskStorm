@@ -35,9 +35,9 @@ public class IssueController : ControllerBase
         {
             issue = await _is.CreateIssueAsync(req);
         }
-        catch (IssueCreationException)
+        catch (IssueCreationException e)
         {
-
+            l.LogError($"Error creating issue: {e.Message}");
             throw;
         }
 

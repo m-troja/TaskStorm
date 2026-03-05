@@ -15,8 +15,9 @@ public record IssueDto(
     DateTime CreatedAt, 
     DateTime? DueDate,
     DateTime? UpdatedAt, 
-    ICollection<CommentDto> Comments, 
     int ProjectId,
-    TeamDto Team)
+    int teamId
+    
+    )
 { }
 
