@@ -11,6 +11,9 @@ using System.Security.Claims;
 using System.Text;
 using System.Text.Json.Serialization;
 using TaskStorm.Data;
+using TaskStorm.EventBus;
+using TaskStorm.EventBus.Handler;
+using TaskStorm.EventBus.Impl;
 using TaskStorm.Exception.Handler;
 using TaskStorm.Model.DTO.Cnv;
 using TaskStorm.Security;
@@ -77,6 +80,7 @@ try
     Log.Information("Starting TaskStorm WebApplication...");
 
     var builder = WebApplication.CreateBuilder(args);
+    
     DotNetEnv.Env.Load("dev.env");
 
     // -------------------
@@ -173,6 +177,8 @@ try
     builder.Services.AddScoped<ActivityCnv>();
     builder.Services.AddScoped<ISlackNotificationService, SlackNotificationService>();
     builder.Services.AddScoped<IFileService, FileService>();
+    builder.Services.AddSingleton<IEventPublisher, ActiveMqEventPublisher>();
+    builder.Services.AddHostedService<IssueEventHandler>();
 
     builder.Services.AddControllers().AddJsonOptions(options =>
     {
