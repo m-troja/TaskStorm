@@ -14,13 +14,4 @@ public interface IActivityService
     Task<ActivityPropertyUpdated> UpdateDueDateAsync(DateTime OldValue, DateTime NewValue, int issueId, int userId);
     Task<ActivityPropertyUpdated> UpdateDescriptionAsync(string OldValue, string NewValue, int issueId, int userId);
     Task<ActivityPropertyUpdated> UpdateTitleAsync(string OldValue, string NewValue, int issueId, int userId);
-
-    Task<ActivityPropertyCreated> CreateActivityPropertyCreatedAsync(
-        ActivityType Type,
-        int issueId,
-        int authorId);
-
-    Task<List<Activity>> GetActivitiesByIssueIdAsync(int issueId);
-
-    Task DeleteActivitiesForIssueId(int id);
 }

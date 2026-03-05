@@ -25,8 +25,6 @@ public class IssueController : ControllerBase
     private readonly ActivityCnv _activityCnv;
     private readonly IActivityService _activityService;
 
-
-    [Authorize]
     [HttpPost]
     [Route("create")]
     public async Task<ActionResult<IssueDto>> CreateIssue(CreateIssueRequest req)
@@ -88,81 +86,16 @@ public class IssueController : ControllerBase
         return Ok(IssueDto);
     }
 
-    [HttpPut("assign")]
-    public async Task<ActionResult<IssueDto>> AssignIssue([FromBody] AssignIssueRequest req)
+    [HttpPut("update")]
+    public async Task<ActionResult<IssueDto>> UpdateIssue([FromBody] UpdateIssueRequest req)
     {
         int userId = int.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
 
-        l.LogDebug($"Received assign issue request: {req}, userId={userId}");
-        var issue = await _is.AssignIssueAsync(req, userId);
+        l.LogDebug($"Received UpdateIssue request: {req}");
+        var issue = await _is.HandleUpdateIssueRequestAsync(req, userId);
         return Ok(_issueCnv.EntityToDto(issue));
     }
 
-    [HttpPut("rename")]
-    public async Task<ActionResult<IssueDto>> RenameIssue([FromBody] RenameIssueRequest req)
-    {
-        int userId = int.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
-
-        l.LogDebug($"Received rename issue request: {req.IssueId}, {req.newTitle}");
-        var issueDto = await _is.RenameIssueAsync(req, userId);
-        return Ok(issueDto);
-    }
-
-    [HttpPut("update-description")]
-    public async Task<ActionResult<Issue>> UpdateDescription([FromBody] UpdateDescriptionRequest req)
-    {
-        int userId = int.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
-
-        l.LogDebug($"Received update-description request: {req.issueId}, {req.newDescription}");
-        var issue = await _is.UpdateDescriptionAsync(req, userId);
-        return Ok(_issueCnv.EntityToDto(issue));
-    }
-
-    [HttpPut("assign-team")]
-    public async Task<ActionResult<IssueDto>> AssignTeam([FromBody] AssignTeamRequest req)
-    {
-        int userId = int.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
-
-        l.LogDebug($"Received AssignTeam request: {req.IssueId}, {req.TeamId}");
-        var issueDto = await _is.AssignTeamAsync(req, userId);
-        return Ok(issueDto);
-    }
-
-    [HttpPut("update-status")]
-    public async Task<ActionResult<IssueDto>> ChangeIssueStatus([FromBody] ChangeIssueStatusRequest req)
-    {
-        int userId = int.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
-
-        l.LogDebug($"Received update issue status request: {req.IssueId}, {req.NewStatus}, userId: {userId}");
-        var issueDto = await _is.ChangeIssueStatusAsync(req, userId);
-        return Ok(issueDto);
-    }
-
-    [HttpPut("update-priority")]
-    public async Task<ActionResult<IssueDto>> UpdateIssuePriority([FromBody] ChangeIssuePriorityRequest req)
-    {
-        int userId = int.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
-
-        l.LogDebug($"Received update issue priority request: {req.IssueId}, {req.NewPriority}, userId: {userId}");
-        var issueDto = await _is.ChangeIssuePriorityAsync(req, userId);
-        return Ok(issueDto);
-    }
-
-    [HttpPut("update-due-date")]
-    public async Task<ActionResult<IssueDto>> UpdateDueDate([FromBody] UpdateDueDateRequest req)
-    {
-        int userId = int.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
-
-        if (req is null || req.IssueId <= 0 || !req.DueDate.HasValue)
-        {
-            l.LogDebug($"Invalid UpdateDueDateRequest");
-            throw new BadRequestException("Invalid request. IssueId must be positive and DueDate cannot be null.");
-        }
-
-        l.LogDebug($"Received update due date request: {req.IssueId}, {req.DueDate}, userId: {userId}");
-        var issueDto = await _is.UpdateDueDateAsync(req, userId);
-        return Ok(issueDto);
-    }
 
     [HttpGet("user/{userId:int}")]
     public async Task<ActionResult<List<IssueDto>>> GetAllIssuesByUserId(int userId)

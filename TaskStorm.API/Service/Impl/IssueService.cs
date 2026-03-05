@@ -1,5 +1,7 @@
 ﻿using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.VisualBasic;
+using System.ComponentModel.DataAnnotations;
 using System.Text;
 using TaskStorm.Data;
 using TaskStorm.Exception;
@@ -22,155 +24,180 @@ public class IssueService : IIssueService
     private readonly CommentCnv _commentCnv;
     private readonly IssueCnv _issueCnv;
     private readonly IUserService _userService;
-    private readonly IProjectService _projectService;
     private readonly ILogger<IssueService> l;
-    private readonly ITeamService _teamService;
     private readonly IActivityService _activityService;
     private readonly ISlackNotificationService _slackNotificationService;
 
-    public IssueService(PostgresqlDbContext db, IUserService userService, CommentCnv commentCnv, IssueCnv issueCnv, IProjectService projectService, ILogger<IssueService> l, ITeamService teamService, 
+    public IssueService(PostgresqlDbContext db, IUserService userService, CommentCnv commentCnv, IssueCnv issueCnv, ILogger<IssueService> l,
         IActivityService activityService, ISlackNotificationService slackNotificationService)
     {
         _db = db;
         _userService = userService;
         _commentCnv = commentCnv;
         _issueCnv = issueCnv;
-        _projectService = projectService;
         this.l = l;
-        _teamService = teamService;
         _activityService = activityService;
         _slackNotificationService = slackNotificationService;
     }
 
     public async Task<Issue> CreateIssueAsync(CreateIssueRequest req)
     {
-        var reqValidated = await ValidateCreateIssueRequest(req);
+        l.LogDebug($"Starting new issue creation for authorId: {req.authorId}, projectId: {req.projectId}");
 
         await createSystemUserId();
 
-        l.LogDebug($"Starting issue creation for authorId: {reqValidated.assigneeId}, projectId: {reqValidated.projectId}");
-
-        User author = await _userService.GetByIdAsync(reqValidated.authorId);
-        int AuthorIdToSet = reqValidated.authorId != 0 ? reqValidated.authorId : SystemUserId;
-        var authorToSet = author != null ? author : await _userService.GetByIdAsync(SystemUserId);
-        User ? assignee = reqValidated.assigneeId.HasValue ? await _userService.GetByIdAsync(reqValidated.assigneeId.Value) : await _userService.GetByIdAsync(SystemUserId);
-
-        DateTime? dueDateUtc = null;
-        if (!string.IsNullOrEmpty(reqValidated.dueDate))
-        {
-            dueDateUtc = DateTime.SpecifyKind(DateTime.Parse(reqValidated.dueDate), DateTimeKind.Utc);
-            l.LogDebug($"Parsed due date UTC: {dueDateUtc}");
-        }
-
-        IssuePriority priorityToSet = IssuePriority.NORMAL;
-        if (!string.IsNullOrEmpty(reqValidated.priority))
-        {
-            if (!Enum.TryParse<IssuePriority>(reqValidated.priority, true, out var parsedPriority) || !Enum.IsDefined(typeof(IssuePriority), parsedPriority))
-            {
-                l.LogDebug($"Invalid issue priority: {reqValidated.priority}");
-            }
-            else
-            {
-                priorityToSet = Enum.Parse<IssuePriority>(reqValidated.priority);
-            }
-        }
-
-        Project project;
-        try
-        {
-            project = await _projectService.GetProjectById(reqValidated.projectId);
-        }
-        catch (ProjectNotFoundException e)
-        {
-            l.LogDebug($"ProjectId {reqValidated.projectId} was not found - assigned DummyProjectId={DummyProjectId}");
-            project = await _projectService.GetProjectById(DummyProjectId);
-        }
-
-        l.LogDebug($"Retrieved project from DB: {project}");
-
-        Issue issue;
+        var issue = await ValidateCreateIssueRequest(req);
 
         using var transaction = await _db.Database.BeginTransactionAsync();
+       
         try
         {
-
             int maxIdInsideProject = await _db.Issues
-                .Where(i => i.ProjectId == project.Id)
+                .Where(i => i.ProjectId == issue.Project.Id)
                 .MaxAsync(i => (int?)i.IdInsideProject) ?? 0;
             l.LogDebug($"Retrieved maxIdInsideProject from DB: {maxIdInsideProject}");
 
-            int nextIdInsideProject = maxIdInsideProject + 1;
-
-            issue = new Issue
-            {
-                Title = reqValidated.title,
-                Description = reqValidated.description,
-                Priority = priorityToSet,
-                Author = authorToSet,
-                AuthorId = AuthorIdToSet,
-                Assignee = assignee,
-                AssigneeId = assignee?.Id,
-                DueDate = dueDateUtc,
-                ProjectId = project.Id,
-                IdInsideProject = nextIdInsideProject
-            };
-
-            l.LogDebug($"Defined new issue entity: {issue}");
-
-            _db.Issues.Add(issue);
+            await _db.Issues.AddAsync(issue);
             await _db.SaveChangesAsync();
 
-            l.LogDebug($"Issue of ID {issue.Id} created successfully");
-            
-            var key = new Key(project, issue);
+            var key = new Key(issue.Project, issue);
             issue.Key = key;
 
-            _db.Keys.Add(key);
+            await _db.Keys.AddAsync(key);
             await _db.SaveChangesAsync();
             await transaction.CommitAsync();
             
-            l.LogDebug($"Keystring {issue.Key.KeyString} for id {issue.Id} and IdInsideProject {issue.IdInsideProject}");
+            l.LogDebug($"Created successfully Keystring: {issue.Key.KeyString},  IssueId: {issue.Id}, IdInsideProject: {issue.IdInsideProject}");
 
             var activity = await _activityService.CreateIssueAsync(issue.Id, issue.AuthorId);
         }
         catch (System.Exception )
         {
-            l.LogDebug($"Error occurred while creating issue for project {reqValidated.projectId}");
+            l.LogDebug($"Error occurred while creating issue for project {issue.ProjectId}");
             await transaction.RollbackAsync();
             throw;
         }
         l.LogDebug($"Issue creation transaction completed successfully for issue ID {issue.Id}");
-        await _slackNotificationService.SendIssueCreatedNotificationAsync(issue, authorToSet);
+
+        await _slackNotificationService.SendIssueCreatedNotificationAsync(issue, issue.Author);
+
         l.LogDebug($"Sent issue created notification for issue ID {issue.Id}");
 
         return issue;
     }
-    private async Task<CreateIssueRequest> ValidateCreateIssueRequest(CreateIssueRequest req)
+    private async Task<Issue> ValidateCreateIssueRequest(CreateIssueRequest req)
     {
-        if (string.IsNullOrEmpty(req.title)) throw new BadRequestException("Title cannot be empty");
-        if (req.authorId < 1) throw new BadRequestException("AuthorId must be positive");
-        if (req.projectId == null) throw new BadRequestException("ProjectId must be provided");
-        if (req.priority != null && (!Enum.TryParse<IssuePriority>(req.priority, true, out var _) || !Enum.IsDefined(typeof(IssuePriority), Enum.Parse<IssuePriority>(req.priority, true))))
+        // Project
+        Project project = await ValidateProjectAsync(req.projectId);
+
+        // Due Date
+        DateTime? dueDateUtc = await ValidateDueDateAsync(req.dueDate ?? "2026-01-01");
+
+        // Priority
+        IssuePriority priorityToSet = await ValidatePriority(req.priority ?? "NORMAL");
+
+        // Author 
+        User author = await GetUserByIdAsync(req.authorId);
+
+        // Assignee
+        User? assignee = await GetUserByIdAsync(req.assigneeId ?? SystemUserId);
+
+        // Title
+        string title = await ValidateTitleAsync(req.title);
+
+        // Description
+        string description = await ValidateDescriptionAsync(req.description ?? "");
+
+        // Issue object
+        var issueValidated = new Issue
         {
-            throw new BadRequestException($"Invalid issue priority: {req.priority}");
-        }
-        if (req.dueDate != null && !DateTime.TryParse(req.dueDate, out var _))
+            Title = title,
+            Description = description,
+            Priority = priorityToSet,
+            AuthorId = author.Id,
+            Author = author,
+            Assignee = assignee,
+            AssigneeId = assignee.Id,
+            DueDate = dueDateUtc,
+            Project = project,
+            ProjectId = project.Id
+        };
+        return issueValidated;
+    }
+
+    private async Task<Project> ValidateProjectAsync(int projectId)
+    {
+        Project project;
+        try
         {
-            throw new BadRequestException($"Invalid due date format: {req.dueDate}");
+            project = await _db.Projects.FirstOrDefaultAsync(p => p.Id == projectId) ?? throw new ProjectNotFoundException("Project was not found");
         }
-        if (req.assigneeId.HasValue && req.assigneeId.Value < -1)
+        catch (ProjectNotFoundException e)
         {
-            throw new BadRequestException("AssigneeId must be greater than or equal to -1");
+            l.LogDebug($"ProjectId {projectId} was not found - assigned DummyProjectId={DummyProjectId}");
+            project = await _db.Projects.FirstOrDefaultAsync(p => p.Id == DummyProjectId) ?? throw new ProjectNotFoundException("DummyProject was not found");
         }
-        if (req.authorId != -1 && !_db.Users.Any(u => u.Id == req.authorId)) throw new BadRequestException("Author user was not found");
-        if (req.assigneeId.HasValue && req.assigneeId.Value != -1 && !_db.Users.Any(u => u.Id == req.assigneeId.Value)) throw new BadRequestException("Assignee user was not found");
-        string title = req.title;
-        if (req.title.Length > 255) title = req.title.Substring(0, 255);
-        string description = req.description;
-        if (req.description != null && req.description.Length > 1000) description = req.description.Substring(0, 1000);
-        return new CreateIssueRequest(title, description, req.priority, req.authorId, req.assigneeId, req.dueDate, req.projectId);
+        return project;
+    }
+    private async Task<Team> ValidateTeam(int teamId)
+    {
+        Team team;
+        try
+        {
+            team = await _db.Teams.FirstOrDefaultAsync(t => t.Id == teamId) ?? throw new ContentNotFoundException("Team was not found");
+        }
+        catch (ContentNotFoundException e)
+        {
+            l.LogDebug($"TeamId {teamId} was not found - assigned null");
+            throw new BadRequestException("Team was not found");
+        }
+        return team;
+    }
+    private async Task<IssueStatus> ValidateStatus(string status)
+    {
+        if (string.IsNullOrEmpty(status)) return IssueStatus.NEW;
+        if (!Enum.TryParse<IssueStatus>(status, true, out var parsedStatus) || !Enum.IsDefined(typeof(IssueStatus), parsedStatus))
+        {
+            l.LogDebug($"Invalid issue status: {status}, defaulting to OPEN");
+            return IssueStatus.NEW;
+        }
+        return Enum.Parse<IssueStatus>(status);
+    }
+
+    private async Task<DateTime> ValidateDueDateAsync(string dueDdate)
+    {
+        if (string.IsNullOrEmpty(dueDdate)) return DateTime.UtcNow;
+        if (!DateTime.TryParse(dueDdate, out var parsedDueDate))
+        {
+            l.LogDebug($"Invalid due date: {dueDdate}, defaulting to UtcNow");
+            return DateTime.UtcNow;
+        }
+        return DateTime.SpecifyKind(parsedDueDate, DateTimeKind.Utc);
 
     }
+    private async Task<IssuePriority> ValidatePriority(string priority)
+    {
+        if (string.IsNullOrEmpty(priority)) return IssuePriority.NORMAL;
+        if (!Enum.TryParse<IssuePriority>(priority, true, out var parsedPriority) || !Enum.IsDefined(typeof(IssuePriority), parsedPriority))
+        {
+            l.LogDebug($"Invalid issue priority: {priority}, defaulting to NORMAL");
+            return IssuePriority.NORMAL;
+        }
+        return Enum.Parse<IssuePriority>(priority);
+    }
+
+    private async Task<string> ValidateTitleAsync(string title)
+    {
+        if (string.IsNullOrEmpty(title)) throw new BadRequestException("Title cannot be empty");
+        if (title.Length > 255) title = title.Substring(0, 255);
+        return title;
+    }
+    private async Task<string> ValidateDescriptionAsync(string description)
+    {
+        if (description.Length > 1000) description = description.Substring(0, 1000);
+        return description;
+    }
+
 
     public async Task<IssueDto> GetIssueDtoByIdAsync(int id)
     {
@@ -225,7 +252,7 @@ public class IssueService : IIssueService
         }
 
         l.LogDebug($"Assigning issue {req.IssueId} to user {req.AssigneeId}, event author={userId}");
-        var newAssignee = await _db.Users.AnyAsync(u => u.Id == req.AssigneeId) ? await _userService.GetByIdAsync(req.AssigneeId) : throw new BadRequestException("Assignee user was not found") ;
+        var newAssignee = await _db.Users.AnyAsync(u => u.Id == req.AssigneeId) ? await GetUserByIdAsync(req.AssigneeId) : throw new BadRequestException("Assignee user was not found") ;
         l.LogDebug($"Fetched new assignee: {newAssignee}");
         
         var issue = await GetIssueFromDb(req.IssueId);
@@ -300,7 +327,6 @@ public class IssueService : IIssueService
     private async Task<Issue> UpdateIssueAsync(Issue issue)
     {
         l.LogDebug($"Updating issue {issue.Id}");
-        issue.UpdatedAt = DateTime.UtcNow;
         _db.Issues.Update(issue);
         await _db.SaveChangesAsync();
         return issue;
@@ -403,7 +429,7 @@ public class IssueService : IIssueService
         }
 
         l.LogDebug($"Assigning team {req.TeamId} to issue {req.IssueId}, userId={userId}");
-        Team team = await _teamService.GetTeamByIdAsync(req.TeamId);
+        Team team = await _db.Teams.FirstOrDefaultAsync(t => t.Id == req.TeamId) ?? throw new ContentNotFoundException("Team was not found");
         Issue issue = await GetIssueFromDb(req.IssueId);
         var oldTeamId = issue.TeamId.HasValue ? issue.TeamId.Value : -1;
 
@@ -447,7 +473,7 @@ public class IssueService : IIssueService
     public async Task<IEnumerable<IssueDto>> GetIssuesByProjectId(int projectId)
     {
         l.LogDebug($"Getting all issues for projectId {projectId}");
-        Project project = await _projectService.GetProjectById(projectId);
+        var project = await _db.Projects.FirstOrDefaultAsync(p => p.Id == projectId) ?? throw new ProjectNotFoundException("Project was not found");
         var issueIds = await _db.Issues.Where(i => i.ProjectId == projectId).Select(i => i.Id).ToListAsync();
         var issues = await GetListOfIssuesFromDb(issueIds);
         l.LogDebug($"Fetched {issues.Count} issues for projectId {projectId}");
@@ -611,5 +637,118 @@ public class IssueService : IIssueService
             .Include(i => i.Team)
             .ToListAsync();
         return issues;
+    }
+
+    public async Task<Issue> HandleUpdateIssueRequestAsync(UpdateIssueRequest req, int userId)
+    {
+        l.LogInformation($"Updating issue {req.IssueId}");
+
+        var issue = await GetIssueFromDb(req.IssueId);
+        var userEventAuthor = await GetUserByIdAsync(userId);
+
+        var changes = new IssueChanges
+        {
+            OldTitle = issue.Title,
+            OldDescription = issue.Description,
+            OldStatus = issue.Status,
+            OldPriority = issue.Priority,
+            OldAssigneeId = issue.AssigneeId,
+            OldTeamId = issue.TeamId,
+            OldDueDate = issue.DueDate
+        };
+
+        if (req.Title != null)
+            issue.Title = await ValidateTitleAsync(req.Title);
+
+        if (req.Description != null)
+            issue.Description = await ValidateDescriptionAsync(req.Description);
+
+        if (req.Priority != null)
+            issue.Priority = await ValidatePriority(req.Priority);
+
+        if (req.Status != null)
+            issue.Status = await ValidateStatus(req.Status);
+
+        if (req.AssigneeId.HasValue)
+        {
+            issue.Assignee = await GetUserByIdAsync(req.AssigneeId.Value);
+            issue.AssigneeId = req.AssigneeId.Value;
+        }
+
+        if (req.DueDate != null)
+            issue.DueDate = await ValidateDueDateAsync(req.DueDate);
+
+        if (req.TeamId.HasValue)
+        {
+            var team = await ValidateTeam(req.TeamId.Value);
+            issue.Team = team;
+            issue.TeamId = team.Id;
+        }
+
+        await UpdateIssueAsync(issue);
+
+        changes.NewTitle = issue.Title;
+        changes.NewDescription = issue.Description;
+        changes.NewStatus = issue.Status;
+        changes.NewPriority = issue.Priority;
+        changes.NewAssigneeId = issue.AssigneeId;
+        changes.NewTeamId = issue.TeamId;
+        changes.NewDueDate = issue.DueDate;
+
+        await ProcessIssueChanges(issue, changes, userEventAuthor);
+
+        return issue;
+    }
+
+    private async Task ProcessIssueChanges(Issue issue, IssueChanges c, User eventAuthor)
+    {
+        if (c.OldTitle != c.NewTitle)
+        {
+            await _activityService.UpdateTitleAsync(c.OldTitle, c.NewTitle, issue.Id, eventAuthor.Id);
+            await _slackNotificationService.SendUpdateTitleAsync(issue, eventAuthor);
+        }
+
+        if (c.OldDescription != c.NewDescription)
+        {
+            await _activityService.UpdateDescriptionAsync(c.OldDescription, c.NewDescription, issue.Id, eventAuthor.Id);
+            await _slackNotificationService.SendUpdateDescriptionAsync(issue, eventAuthor);
+        }
+
+        if (c.OldStatus != c.NewStatus)
+        {
+            await _activityService.UpdateStatusAsync(c.OldStatus.Value, c.NewStatus.Value, issue.Id, eventAuthor.Id);
+            await _slackNotificationService.SendIssueStatusChangedNotificationAsync(issue, eventAuthor);
+        }
+
+        if (c.OldPriority != c.NewPriority)
+        {
+            await _activityService.UpdatePriorityAsync(c.OldPriority.Value, c.NewPriority.Value, issue.Id, eventAuthor.Id);
+            await _slackNotificationService.SendIssuePriorityChangedNotificationAsync(issue, eventAuthor);
+        }
+
+        if (c.OldAssigneeId != c.NewAssigneeId)
+        {
+            await _activityService.UpdateAssigneeAsync(c.OldAssigneeId ?? -1, c.NewAssigneeId ?? -1, issue.Id, eventAuthor.Id);
+            await _slackNotificationService.SendIssueAssignedNotificationAsync(issue, eventAuthor);
+        }
+
+        if (c.OldTeamId != c.NewTeamId)
+        {
+            await _activityService.UpdateTeamAsync(c.OldTeamId ?? -1, c.NewTeamId ?? -1, issue.Id, eventAuthor.Id);
+            await _slackNotificationService.SendTeamAssignedNotificationAsync(issue, eventAuthor);
+        }
+
+        if (c.OldDueDate != c.NewDueDate)
+        {
+            await _activityService.UpdateDueDateAsync(c.OldDueDate ?? DateTime.MinValue, c.NewDueDate ?? DateTime.MinValue, issue.Id, eventAuthor.Id);
+            await _slackNotificationService.SendIssueDueDateUpdatedNotificationAsync(issue, eventAuthor);
+        }
+    }
+
+    private async Task<User> GetUserByIdAsync(int userId)
+    {
+        l.LogDebug($"Fetching user with ID {userId}");
+        return await _db.Users.FirstOrDefaultAsync(u => u.Id == userId) ?? throw new UserNotFoundException("User was not found");
+
     }
 }
