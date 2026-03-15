@@ -141,7 +141,7 @@ public class IssueController : ControllerBase
     public async Task<ActionResult<string>> DeleteAllIssues()
     {
         l.LogInformation("Triggered endpoint Delete all issues");
-        await _is.deleteAllIssues();
+        await _is.DeleteAllIssues();
         return Ok("All issues deleted successfully");
     }
 

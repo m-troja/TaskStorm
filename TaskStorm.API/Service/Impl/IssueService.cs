@@ -459,6 +459,19 @@ public class IssueService : IIssueService
         var issuesDto = _issueCnv.EntityListToDtoList(issues);
         return issuesDto;
     }
+
+    public async Task<IEnumerable<Issue>> GetIssuesBySlackUserId(string slackUserId)
+    {
+        l.LogDebug($"GetIssuesBySlackUserId for slackUserId {slackUserId}");
+        var user = await _db.Users.FirstOrDefaultAsync(u => u.SlackUserId == slackUserId) ?? throw new UserNotFoundException("User was not found by slackUserId");
+        var issueIds = await _db.Issues.Where(i => i.AssigneeId == user.Id ).Select(i => i.Id).ToListAsync();
+
+        var issues = await GetListOfIssuesFromDb(issueIds);
+
+        l.LogDebug($"Fetched {issues.Count} issues for userId {user.Id} by slackUserId  {slackUserId}");
+        return issues;
+    }
+
     public async Task<IEnumerable<IssueDto>> GetIssuesByTeamId(int teamId)
     {
         l.LogDebug($"Getting all issues for teamId {teamId}");
@@ -547,7 +560,7 @@ public class IssueService : IIssueService
         return issueDtos;
     }
 
-    public async Task deleteAllIssues()
+    public async Task DeleteAllIssues()
     {
         await _db.Database.ExecuteSqlRawAsync("DELETE FROM Issues");
         l.LogInformation("Deleted all issues from database");
@@ -753,5 +766,10 @@ public class IssueService : IIssueService
         l.LogDebug($"Fetching user with ID {userId}");
         return await _db.Users.FirstOrDefaultAsync(u => u.Id == userId) ?? throw new UserNotFoundException("User was not found");
 
+    }
+
+    public Task<Issue> AssignIssuesBySlackAsync(AssignIssueRequestChatGpt uir, int userId)
+    {
+        throw new NotImplementedException();
     }
 }

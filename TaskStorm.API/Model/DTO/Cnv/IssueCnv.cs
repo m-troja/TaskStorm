@@ -1,4 +1,5 @@
 ﻿using System.Runtime.InteropServices;
+using TaskStorm.Model.DTO.ChatGpt;
 using TaskStorm.Model.Entity;
 using TaskStorm.Model.IssueFolder;
 
@@ -63,6 +64,16 @@ public class IssueCnv
         foreach (var issue in issues)
         {
             issueDtos.Add(EntityToDto(issue));
+        }
+        return issueDtos;
+    }
+
+    public List<IssueDtoChatGpt> EntityListToChatGptDtoList(IEnumerable<Issue> issues)
+    {
+        var issueDtos = new List<IssueDtoChatGpt>();
+        foreach (var issue in issues)
+        {
+            issueDtos.Add(EntityToIssueDtoChatGpt(issue));
         }
         return issueDtos;
     }

@@ -13,12 +13,13 @@ namespace TaskStorm.Service
         Task<Issue> CreateIssueAsync(CreateIssueRequest cir);
         Task<Issue> HandleUpdateIssueRequestAsync(UpdateIssueRequest req, int userId);
         Task<IssueDtoChatGpt> CreateIssueBySlackAsync(SlackCreateIssueRequest scis);
-        Task<Issue> AssignIssueBySlackAsync(AssignIssueRequestChatGpt uir, int userId);
+        Task<Issue> AssignIssuesBySlackAsync(AssignIssueRequestChatGpt uir, int userId);
         Task<IEnumerable<IssueDto>> GetIssuesByUserId(int userId);
+        Task<IEnumerable<Issue>> GetIssuesBySlackUserId(string slackUserId);
         Task<IEnumerable<IssueDto>> GetIssuesByProjectId(int projectId);
         Task<int> GetIssueIdFromKey(string key);
         Task<IEnumerable<IssueDto>> GetAllIssues();
-        Task deleteAllIssues();
+        Task DeleteAllIssues();
         Task DeleteIssueByIdAsync(int id, int userId);
         Task<IEnumerable<IssueDto>> GetIssuesByTeamId(int teamId);
     }

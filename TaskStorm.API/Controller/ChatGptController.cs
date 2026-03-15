@@ -41,9 +41,20 @@ public class ChatGptController : ControllerBase
         int userId = int.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
 
         l.LogInformation($"Received AssignIssueBySlack request: {req}, userId={userId}");
-        var issue = await _iss.AssignIssueBySlackAsync(req, userId);
+        var issue = await _iss.AssignIssuesBySlackAsync(req, userId);
         return _issueCnv.EntityToIssueDtoChatGpt(issue);
     }
+
+    [HttpGet("issues/slack-user-id/{slackUserId}")]
+    public async Task<ActionResult<List<IssueDtoChatGpt>>> GetIssuesBySlackUserId(string slackUserId)
+    {
+        l.LogInformation($"Received GetIssuesBySlackUserId: {slackUserId}");
+        var issues = await _iss.GetIssuesBySlackUserId(slackUserId);
+        var dtos = _issueCnv.EntityListToChatGptDtoList(issues);
+
+        return Ok(dtos);
+    }
+
 
     public ChatGptController(IUserService userService, ILogger<ChatGptController> logger, IIssueService iss, IssueCnv issueCnv)
     {
