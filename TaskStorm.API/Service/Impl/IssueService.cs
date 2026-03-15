@@ -533,7 +533,11 @@ public class IssueService : IIssueService
         l.LogDebug("Creating issue via Slack with request: " + req);
         l.LogDebug("Fetching author and assignee IDs from Slack user IDs");
         int authorId = await _userService.GetIdBySlackUserId(req.authorSlackId);
-        int assigneeId = await _userService.GetIdBySlackUserId(req.assigneeSlackId);
+        int assigneeId = -1;
+        if (req.assigneeSlackId != null)
+        {
+            assigneeId = await _userService.GetIdBySlackUserId(req.assigneeSlackId);
+        }
         l.LogDebug($"Fetched authorId: {authorId}, assigneeId: {assigneeId}");
         var createIssueRequest = new CreateIssueRequest(
              req.title,
