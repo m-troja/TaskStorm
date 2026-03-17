@@ -56,14 +56,19 @@ public class IssueService : IIssueService
             int maxIdInsideProject = await _db.Issues
                 .Where(i => i.ProjectId == issue.Project.Id)
                 .MaxAsync(i => (int?)i.IdInsideProject) ?? 0;
+            l.LogDebug($"Retrieved maxIdInsideProject from DB: {maxIdInsideProject}");
+            l.LogDebug($"issue.Project.Id used in query: {issue.Project.Id}"); 
+            l.LogDebug($"ProjectId used in query: {issue.ProjectId}");
 
             issue.IdInsideProject = maxIdInsideProject + 1;
+            l.LogDebug($"issue.IdInsideProject: {issue.IdInsideProject}");
 
             await _db.Issues.AddAsync(issue);
             await _db.SaveChangesAsync();
 
             var key = new Key(issue.Project, issue);
             issue.Key = key;
+            l.LogDebug($"issue.Key: {issue.Key}");
 
             await _db.Keys.AddAsync(key);
             await _db.SaveChangesAsync();
