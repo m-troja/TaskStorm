@@ -56,7 +56,8 @@ public class IssueService : IIssueService
             int maxIdInsideProject = await _db.Issues
                 .Where(i => i.ProjectId == issue.Project.Id)
                 .MaxAsync(i => (int?)i.IdInsideProject) ?? 0;
-            l.LogDebug($"Retrieved maxIdInsideProject from DB: {maxIdInsideProject}");
+
+            issue.IdInsideProject = maxIdInsideProject + 1;
 
             await _db.Issues.AddAsync(issue);
             await _db.SaveChangesAsync();
