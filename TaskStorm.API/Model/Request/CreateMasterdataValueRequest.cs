@@ -2,7 +2,7 @@
 
 namespace TaskStorm.Model.Request;
 
-public record CreateMasterdataValueRequest(
+public record MasterdataValueRequest(
     int Order, 
     string Value,
     string Code,

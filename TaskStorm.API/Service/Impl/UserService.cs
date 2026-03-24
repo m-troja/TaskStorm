@@ -76,6 +76,8 @@ public class UserService : IUserService
     {
         _db.Users.Update(user);
         await _db.SaveChangesAsync();
+        var userUpdated = await _db.Users.FirstOrDefaultAsync(u => u.Id == user.Id);
+        l.LogDebug($"updated user: {userUpdated}");
     }
 
     public async Task<List<User>> GetAllUsersAsync()

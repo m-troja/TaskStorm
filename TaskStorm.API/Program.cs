@@ -245,8 +245,6 @@ try
 
     app.UseMiddleware<GlobalExceptionHandler>();
 
-    // TEST LOG REQUESTS
-
     app.UseRouting();
     app.UseCors("AllowAll");
     app.UseAuthentication();

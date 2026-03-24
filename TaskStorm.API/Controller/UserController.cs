@@ -87,9 +87,11 @@ public class UserController : ControllerBase
     }
 
     [HttpPut("{id:int}")]
-    public async Task<ActionResult<UserDto>> UpdateUser(int id, [FromBody] UpdateUserDto dto)
+    public async Task<ActionResult<UserDto>> UpdateUser(int id, [FromBody] UpdateUserDto req)
     {
         _logger.LogInformation($"Triggered endpoint UpdateUser {id}");
+        _logger.LogInformation($"req: {req}");
+        _logger.LogInformation("req: {@req}", req);
 
         var user = await _us.GetByIdAsync(id);
         if (user == null)
@@ -98,11 +100,12 @@ public class UserController : ControllerBase
             return NotFound($"User with id {id} was not found");
         }
 
-        user.FirstName = dto.FirstName;
-        user.LastName = dto.LastName;
-        user.Email = dto.Email;
-        user.SlackUserId = dto.SlackUserId;
-        user.Disabled = dto.Disabled;
+        if (!string.IsNullOrEmpty(req.Email) && req.Email != null) user.Email = req.Email;
+        if (!string.IsNullOrEmpty(req.FirstName) && req.FirstName != null) user.FirstName = req.FirstName;
+        if (!string.IsNullOrEmpty(req.LastName) && req.LastName != null) user.LastName = req.LastName;
+        if (!string.IsNullOrEmpty(req.Email) && req.Email != null) user.Email = req.Email;
+        if (!string.IsNullOrEmpty(req.SlackUserId) && req.SlackUserId != null) user.SlackUserId = req.SlackUserId;
+        if (req.Disabled != null) user.Disabled = (bool) req.Disabled;
 
         await _us.UpdateUserAsync(user);
 

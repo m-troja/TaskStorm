@@ -6,7 +6,8 @@ namespace TaskStorm.Service;
 
 public interface IMasterdataService
 {
-    Task<Masterdata> GetMasterdata();
-    Task<MasterdataValue> CreateMasterdataValue(CreateMasterdataValueRequest req);
+    Task<MasterdataAllTypesWithAllValuesDto> GetAllMasterdata();
+    Task<MasterdataSingleTypeWithValuesDto> SetMasterdataValue(MasterdataValueRequest req);
+    Task<MasterdataSingleTypeWithValuesDto> GetMasterdataValuesForType(MasterdataType type);
 
 }
