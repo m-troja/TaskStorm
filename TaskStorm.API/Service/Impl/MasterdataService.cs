@@ -33,6 +33,9 @@ public class MasterdataService : IMasterdataService
 
     public async Task<MasterdataSingleTypeWithValuesDto> SetMasterdataValue(MasterdataValueRequest req)
     {
+        int orderValidated = req.Order == null ? 0 : (int)req.Order;
+        bool deleteValidated = req.Delete == null ? false : (bool)req.Delete;
+        bool isActiveValidated = req.IsActive == null ? false : (bool)req.IsActive;
         l.LogDebug($"SetMasterdataValue req: ${req}");
 
         if (string.IsNullOrWhiteSpace(req.Code))
@@ -47,31 +50,71 @@ public class MasterdataService : IMasterdataService
             throw new BadRequestException("Value cannot be empty");
         }
 
-        // validate MasterData type
-        if (!Enum.IsDefined(typeof(MasterdataType) ,req.Type))
+        MasterdataType typeEnum;
+
+        if (!Enum.IsDefined(typeof(MasterdataType), req.Type))
         {
             l.LogError($"Invalid MasterData type in request: {req.Type}");
             throw new BadRequestException("Invalid MasterData type in request");
         }
-
-        // check duplicates
-        var exists = await _db.MasterdataValues.AnyAsync(v => v.Value == req.Value || v.Type == req.Type);
-
-        if (exists)
+        else
         {
-            l.LogError($"Type or value already exists: {req.Type}, {req.Value}");
-            throw new BadRequestException($"Type or value already exists: {req.Type}, {req.Value}");
+            typeEnum = req.Type;
         }
 
-        l.LogDebug($"Exists: {exists}");
+        // check duplicates
+        var exists = await _db.MasterdataValues.AnyAsync(v => v.Value == req.Value && v.Type == req.Type || v.Code == req.Code && v.Type == req.Type || v.Value == req.Value && v.Type == req.Type);
+
+        l.LogDebug($"exists: {exists}");
+        l.LogDebug($"req.Value: {req.Value}");
+        l.LogDebug($"req.Type, req.Type: {req.Type}, {req.Type}");
+        l.LogDebug($"req.Delete: {req.Delete}");
+        l.LogDebug($"exists && req.Delete: {exists && deleteValidated}");
+        l.LogDebug($"exists && !req.Delete: {exists && !deleteValidated}");
+        l.LogDebug($"!exists && req.Delete: {!exists && deleteValidated}");
+
+
+        if (exists && deleteValidated)
+        {
+            var existingValue = await _db.MasterdataValues.FirstOrDefaultAsync(v => v.Value == req.Value && v.Type == req.Type ||  v.Code == req.Code && v.Type == req.Type || v.Value == req.Value && v.Type == req.Type);
+            l.LogDebug("existingValue: {@existingValue}", existingValue);
+            if (existingValue != null)
+            {
+                l.LogDebug($"Detected Delete request for Masterdata existingValue: ${existingValue.Value}, ${existingValue.Type}");
+                _db.MasterdataValues.Remove(existingValue);
+                await _db.SaveChangesAsync();
+                l.LogInformation($"Removed MasterdataValue: ${existingValue.Value}, ${existingValue.Type}");
+                return await GetMasterdataValuesForType(req.Type);
+            }
+        }
+        else if (exists && !deleteValidated) 
+        {
+            l.LogError($"Type, code or value pair already exists: {req.Type}, {req.Value}, {req.Code}");
+            throw new BadRequestException($"Type, code or value pair already exists: {req.Type}, {req.Value}, {req.Code}");
+        }
+        else if (!exists && deleteValidated)
+        {
+            l.LogError("Cannot delete not existing masterdata value");
+            throw new BadRequestException("Cannot delete not existing masterdata value");
+        }
+
+        // Validate Order
+        int maxOrder = await _db.MasterdataValues.Where(v => v.Type == req.Type).MaxAsync(v => (int?)v.Order) ?? 0;
+        l.LogDebug($"Maxorder : {maxOrder}");
+
+        orderValidated = maxOrder+1;
+
+        l.LogDebug($"orderValidated : {orderValidated}");
+
         var value = new MasterdataValue()
         {
-            Order = req.Order,
+            Order = orderValidated,
             Code = req.Code,
             Type = req.Type,
             Value = req.Value,
-            IsActive = req.IsActive
+            IsActive = isActiveValidated
         };
+
         await _db.MasterdataValues.AddAsync(value);
         await _db.SaveChangesAsync();
 
@@ -95,7 +138,7 @@ public class MasterdataService : IMasterdataService
         l.LogDebug($"GetMasterdataValuesForType {type}");
         return type switch
         {
-            MasterdataType.IssueLabel =>   await GetAllLabelsAsync(),
+            MasterdataType.ISSUE_LABEL =>   await GetAllLabelsAsync(),
 
             _ =>  throw new ArgumentException("Invalid masterdata type"),  
         };
@@ -104,8 +147,8 @@ public class MasterdataService : IMasterdataService
 
     private async Task<MasterdataSingleTypeWithValuesDto> GetAllLabelsAsync()
     {
-        var values = await _db.MasterdataValues.Where(v => v.Type == MasterdataType.IssueLabel).ToListAsync();
-        var dto = new MasterdataSingleTypeWithValuesDto(MasterdataType.IssueLabel, values);
+        var values = await _db.MasterdataValues.Where(v => v.Type == MasterdataType.ISSUE_LABEL).ToListAsync();
+        var dto = new MasterdataSingleTypeWithValuesDto(MasterdataType.ISSUE_LABEL, values);
         l.LogDebug($"Returning GetAllLabels: {dto}");
         return dto;
     }

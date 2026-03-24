@@ -6,7 +6,7 @@ public class IssueLabel
     
     public IssueLabel()
     {
-        this.Type = MasterdataType.IssueLabel;
+        this.Type = MasterdataType.ISSUE_LABEL;
     }
 
 }

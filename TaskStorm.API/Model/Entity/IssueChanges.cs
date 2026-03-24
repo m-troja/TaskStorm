@@ -1,4 +1,5 @@
-﻿using TaskStorm.Model.IssueFolder;
+﻿using TaskStorm.Model.Entity.Masterdata;
+using TaskStorm.Model.IssueFolder;
 
 namespace TaskStorm.Model.Entity;
 
@@ -24,4 +25,6 @@ public class IssueChanges
 
     public DateTime? OldDueDate { get; set; }
     public DateTime? NewDueDate { get; set; }
+    public ICollection<MasterdataValue>? OldLabels { get; set; }
+    public ICollection<MasterdataValue>? NewLabels { get; set; }
 }

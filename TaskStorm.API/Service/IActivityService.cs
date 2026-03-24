@@ -1,4 +1,5 @@
 ﻿using TaskStorm.Model.Entity;
+using TaskStorm.Model.Entity.Masterdata;
 using TaskStorm.Model.IssueFolder;
 
 public interface IActivityService
@@ -14,4 +15,6 @@ public interface IActivityService
     Task<ActivityPropertyUpdated> UpdateDueDateAsync(DateTime OldValue, DateTime NewValue, int issueId, int userId);
     Task<ActivityPropertyUpdated> UpdateDescriptionAsync(string OldValue, string NewValue, int issueId, int userId);
     Task<ActivityPropertyUpdated> UpdateTitleAsync(string OldValue, string NewValue, int issueId, int userId);
+    Task<ActivityPropertyCreated> CreateLabelAsync(int issueId, MasterdataValue value, int EventAuthorId);
+    Task<ActivityPropertyDeleted> DeleteLabelAsync(int issueId, MasterdataValue value, int userId);
 }

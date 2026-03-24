@@ -17,7 +17,7 @@ public class IssueCnv
     public IssueDto EntityToDto(Issue Issue)
     {
         var labelsStrings = new List<string>();
-        if (Issue.Labels != null) labelsStrings = Issue.Labels.Select(label => label.ToString()).ToList();
+        if (Issue.Labels != null) labelsStrings = Issue.Labels.Select(label => label.Value).ToList();
 
 
         var issueDto = new IssueDto(

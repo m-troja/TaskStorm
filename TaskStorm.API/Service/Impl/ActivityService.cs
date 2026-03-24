@@ -1,8 +1,9 @@
-﻿using TaskStorm.Data;
-using TaskStorm.Model.Entity;
-using TaskStorm.Model.IssueFolder;
+﻿using Microsoft.EntityFrameworkCore;
+using TaskStorm.Data;
 using TaskStorm.Log;
-using Microsoft.EntityFrameworkCore;
+using TaskStorm.Model.Entity;
+using TaskStorm.Model.Entity.Masterdata;
+using TaskStorm.Model.IssueFolder;
 namespace TaskStorm.Service.Impl;
 
 public class ActivityService : IActivityService
@@ -108,6 +109,32 @@ public class ActivityService : IActivityService
         return activity;
     }
 
+    public async Task<ActivityPropertyCreated> CreateLabelAsync(int issueId, MasterdataValue value, int EventAuthorId)
+    {
+        l.LogDebug($"ActivityPropertyUpdated CreateLabelAsync: {value.Value}");
+        var activity = new ActivityPropertyCreated(ActivityType.CREATED_LABEL, issueId, EventAuthorId) { MasterDataCode = value.Code};
+        await _db.Activities.AddAsync(activity);
+        await _db.SaveChangesAsync();
+        return activity;
+    }
+
+    public async Task<ActivityPropertyDeleted> DeleteLabelAsync(int issueId, MasterdataValue value, int userId)
+    {
+        l.LogDebug($"Deleting label activity: {value.Value}");
+
+        var activity = new ActivityPropertyDeleted(
+            ActivityType.DELETED_LABEL,
+            issueId,
+            userId)
+        {
+            MasterDataCode = value.Code
+        };
+
+        _db.Activities.Add(activity);
+        await _db.SaveChangesAsync();
+
+        return activity;
+    }
     public ActivityService(PostgresqlDbContext db, ILogger<ActivityService> l)
     {
         _db = db;

@@ -17,6 +17,10 @@
   </ItemGroup>
 
   <ItemGroup>
+    <None Include="Model\IssueFolder\ActivityPropertyDeleted.cs" />
+  </ItemGroup>
+
+  <ItemGroup>
     <PackageReference Include="DotNetEnv" Version="3.1.1" />
     <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="10.0.1" />
 	<PackageReference Include="Microsoft.EntityFrameworkCore" Version="10.0.1" />

@@ -2,5 +2,5 @@
 
 public enum MasterdataType
 {
-    IssueLabel = 0
+    ISSUE_LABEL = 0
 }

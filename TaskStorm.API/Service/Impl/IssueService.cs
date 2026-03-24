@@ -11,6 +11,7 @@ using TaskStorm.Exception.UserException;
 using TaskStorm.Model.DTO;
 using TaskStorm.Model.DTO.Cnv;
 using TaskStorm.Model.Entity;
+using TaskStorm.Model.Entity.Masterdata;
 using TaskStorm.Model.IssueFolder;
 using TaskStorm.Model.Request;
 
@@ -205,6 +206,23 @@ public class IssueService : IIssueService
         return description;
     }
 
+    private async Task<List<MasterdataValue>> ValidateMasterData(IEnumerable<MasterdataValueRequest> masterdataToValidate)
+    {
+        List<MasterdataValue> validatedMasterdata = new List<MasterdataValue>();
+
+        foreach (var masterdata in  masterdataToValidate)
+        {
+            if (string.IsNullOrEmpty(masterdata.Value)) throw new BadRequestException("Value cannot be empty");
+            if ( !Enum.IsDefined(typeof(MasterdataType), masterdata.Type))
+            {
+                l.LogError($"Invalid MasterdataType: {masterdata.Value}");
+                throw new BadRequestException($"Invalid MasterdataType: {masterdata.Type}");
+            }
+            var value = await _db.MasterdataValues.FirstOrDefaultAsync(v => v.Value == masterdata.Value && v.Type == masterdata.Type && v.Code == masterdata.Code) ?? throw new BadRequestException("Masterdata value was not found");
+            validatedMasterdata.Add(value);
+        }
+        return validatedMasterdata;
+    }
 
     public async Task<IssueDto> GetIssueDtoByIdAsync(int id)
     {
@@ -643,6 +661,7 @@ public class IssueService : IIssueService
             .Include(i => i.Team).ThenInclude(t => t.Users)
             .Include(i => i.Comments).ThenInclude(c => c.Author)
             .Include(i => i.Comments).ThenInclude(c => c.Attachments)
+            .Include(i => i.Labels)
             .FirstOrDefaultAsync(i => i.Id == id);
         l.LogDebug($"Fetched issue: {issue}");
 
@@ -671,6 +690,7 @@ public class IssueService : IIssueService
 
         var issue = await GetIssueFromDb(req.IssueId);
         var userEventAuthor = await GetUserByIdAsync(userId);
+        List<MasterdataValue> newMasterdata = new List<MasterdataValue>();
 
         var changes = new IssueChanges
         {
@@ -680,7 +700,8 @@ public class IssueService : IIssueService
             OldPriority = issue.Priority,
             OldAssigneeId = issue.AssigneeId,
             OldTeamId = issue.TeamId,
-            OldDueDate = issue.DueDate
+            OldDueDate = issue.DueDate,
+            OldLabels = issue.Labels.Where(v => v.Type == MasterdataType.ISSUE_LABEL).ToList()
         };
 
         if (req.Title != null)
@@ -710,6 +731,12 @@ public class IssueService : IIssueService
             issue.Team = team;
             issue.TeamId = team.Id;
         }
+        if (req.MasterDataValues != null)
+        {
+            newMasterdata = await ValidateMasterData(req.MasterDataValues);
+            issue.Labels = newMasterdata.Where(  v => v.Type == MasterdataType.ISSUE_LABEL ).ToList();
+        }
+
 
         await UpdateIssueAsync(issue);
 
@@ -720,10 +747,22 @@ public class IssueService : IIssueService
         changes.NewAssigneeId = issue.AssigneeId;
         changes.NewTeamId = issue.TeamId;
         changes.NewDueDate = issue.DueDate;
+        changes.NewLabels = newMasterdata;
 
         await ProcessIssueChanges(issue, changes, userEventAuthor);
 
         return issue;
+    }
+
+    private (List<MasterdataValue> added, List<MasterdataValue> removed) GetLabelChanges(ICollection<MasterdataValue> oldLabels, ICollection<MasterdataValue> newLabels)
+    {
+        var oldIds = oldLabels.Select(x => x.Id).ToHashSet();
+        var newIds = newLabels.Select(x => x.Id).ToHashSet();
+
+        var added = newLabels.Where(x => !oldIds.Contains(x.Id)).ToList();
+        var removed = oldLabels.Where(x => !newIds.Contains(x.Id)).ToList();
+
+        return (added, removed);
     }
 
     private async Task ProcessIssueChanges(Issue issue, IssueChanges c, User eventAuthor)
@@ -769,6 +808,17 @@ public class IssueService : IIssueService
             await _activityService.UpdateDueDateAsync(c.OldDueDate ?? DateTime.MinValue, c.NewDueDate ?? DateTime.MinValue, issue.Id, eventAuthor.Id);
             await _slackNotificationService.SendIssueDueDateUpdatedNotificationAsync(issue, eventAuthor);
         }
+        var (addedLabels, removedLabels) = GetLabelChanges(c.OldLabels, c.NewLabels);
+
+        foreach (var label in addedLabels)
+        {
+            await _activityService.CreateLabelAsync(issue.Id, label, eventAuthor.Id);
+        }
+
+        foreach (var label in removedLabels)
+        {
+            await _activityService.DeleteLabelAsync(issue.Id, label, eventAuthor.Id);
+        }
     }
 
     private async Task<User> GetUserByIdAsync(int userId)
@@ -781,5 +831,21 @@ public class IssueService : IIssueService
     public Task<Issue> AssignIssuesBySlackAsync(AssignIssueRequestChatGpt uir, int userId)
     {
         throw new NotImplementedException();
+    }
+
+    public async Task<Issue> UpdateMasterdata(UpdateMasterDataRequest req, int userId)
+    {
+        var issue = await GetIssueByIdAsync(req.IssueId);
+
+        switch (req.MasterdataType)
+        {
+            case MasterdataType.ISSUE_LABEL:
+                var value = await _db.MasterdataValues.FirstOrDefaultAsync(v => v.Value == req.MasterDataValue && v.Type == req.MasterdataType && v.Code == req.MasterDataCode) ?? throw new BadRequestException("Masterdata value was not found");
+                issue.Labels.Add(value);
+                break;
+        }
+
+        await UpdateIssueAsync(issue);
+        return issue;
     }
 }

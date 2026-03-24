@@ -154,6 +154,25 @@ public class IssueController : ControllerBase
         return Ok(dtos);
     }
 
+    [HttpPut("masterdata")]
+    public async Task<ActionResult<IssueDto>> UpdateMasterdata([FromBody] UpdateMasterDataRequest req)
+    {
+        int userId = int.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
+
+        l.LogDebug($"Received UpdateMasterdata request: {req}");
+        Issue issue;
+        try
+        {
+            issue = await _is.UpdateMasterdata(req, userId);
+            return _issueCnv.EntityToDto(issue);
+        }
+        catch (BadRequestException e) { 
+        l.LogError($"Error in UpdateMasterdata: ${e.Message}");
+        throw;
+        }
+    }
+
+
     public IssueController(IIssueService @is, ILogger<IssueController> l, IssueCnv _issueCnv, IActivityService _activityService, ActivityCnv activityCnv)
     {
         this._activityService = _activityService;

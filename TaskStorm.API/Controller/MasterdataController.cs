@@ -39,7 +39,7 @@ public class MasterdataController : ControllerBase
         }
         catch (BadRequestException e)
         {
-            return BadRequest("Type or value already exists");
+            throw;
         }
 
         return Ok(md);
