@@ -16,7 +16,8 @@ public record IssueDto(
     DateTime? DueDate,
     DateTime? UpdatedAt, 
     int ProjectId,
-    int teamId
+    int teamId,
+    ICollection<string> labels
     
     )
 { }

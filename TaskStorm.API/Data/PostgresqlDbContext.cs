@@ -1,10 +1,12 @@
 ﻿using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
 using System;
+using System.Reflection.Emit;
 using System.Text;
 using TaskStorm.Controller;
 using TaskStorm.Log;
 using TaskStorm.Model.Entity;
+using TaskStorm.Model.Entity.Masterdata;
 using TaskStorm.Model.IssueFolder;
 using TaskStorm.Service;
 
@@ -23,6 +25,7 @@ public class PostgresqlDbContext : DbContext
     public DbSet<ActivityPropertyUpdated> ActivitiesPropertyUpdated { get; set; }
     public DbSet<Team> Teams { get; set; }
     public DbSet<CommentAttachment> Attachments { get; set; }
+    public DbSet<MasterdataValue> MasterdataValues { get; set; }
     public PostgresqlDbContext(DbContextOptions<PostgresqlDbContext> options)
         : base(options)
     {
@@ -176,6 +179,64 @@ public class PostgresqlDbContext : DbContext
             .HasForeignKey(a => a.CommentId)
             .OnDelete(DeleteBehavior.Cascade);
 
+        //  Issue <-> Labels
+
+        modelBuilder.Entity<Issue>(entity =>
+        {
+            entity.HasKey(i => i.Id);
+
+            entity
+                .HasMany(i => i.Labels)
+                .WithMany(m => m.Issues)
+                .UsingEntity<Dictionary<string, object>>(
+                    "IssueLabels",
+                    j => j
+                        .HasOne<MasterdataValue>()
+                        .WithMany()
+                        .HasForeignKey("MasterdataValueId")
+                        .OnDelete(DeleteBehavior.Cascade),
+                    j => j
+                        .HasOne<Issue>()
+                        .WithMany()
+                        .HasForeignKey("IssueId")
+                        .OnDelete(DeleteBehavior.Cascade),
+                    j =>
+                    {
+                        j.HasKey("IssueId", "MasterdataValueId");
+                        j.ToTable("issue_labels");
+                    }
+                );
+        });
+
+        // MasterdataValue def
+
+        modelBuilder.Entity<MasterdataValue>(entity =>
+        {
+            entity.HasKey(m => m.Id);
+
+            entity.Property(m => m.Code)
+                .IsRequired()
+                .HasMaxLength(100);
+
+            entity.Property(m => m.Value)
+                .IsRequired()
+                .HasMaxLength(100);
+
+            entity.Property(m => m.Type)
+                .IsRequired();
+
+            entity.Property(m => m.Order)
+                .HasDefaultValue(0);
+
+            entity.Property(m => m.IsActive)
+                .HasDefaultValue(true);
+
+            entity.HasIndex(m => new { m.Type, m.Code })
+                .IsUnique();
+
+            entity.ToTable("masterdata_values");
+        });
+
 
         // Seed roles
         modelBuilder.Entity<Role>().HasData(
@@ -192,6 +253,7 @@ public class PostgresqlDbContext : DbContext
             new Project { Id = -1, ShortName = "Dummy", Description = "Predefined dummy project",
                 CreatedAt = new DateTime(2024, 01, 01, 0, 0, 0, DateTimeKind.Utc)
             });
+
     }
 
     // Automatically set CreatedAt for entities implementing IAutomaticDates

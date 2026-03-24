@@ -162,6 +162,7 @@ try
     builder.Services.AddScoped<IChatGptService, ChatGptService>();
     builder.Services.AddScoped<IPasswordService, PasswordService>();
     builder.Services.AddScoped<IJwtGenerator, JwtGenerator>();
+    builder.Services.AddScoped<IMasterdataService, MasterdataService>();
     builder.Services.AddHttpClient<IChatGptService, ChatGptService>();
     builder.Services.AddHttpClient<ISlackNotificationService, SlackNotificationService>();
     builder.Services.AddScoped<UserCnv>();

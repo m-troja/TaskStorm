@@ -1,4 +1,5 @@
 ﻿using TaskStorm.Model.Entity;
+using TaskStorm.Model.Entity.Masterdata;
 using TaskStorm.Service;
 
 namespace TaskStorm.Model.IssueFolder
@@ -17,6 +18,7 @@ namespace TaskStorm.Model.IssueFolder
         public DateTime? DueDate { get; set; }    // UTC
         public IssueStatus Status { get; set; } = IssueStatus.NEW;
         public IssuePriority? Priority { get; set; }
+        public ICollection<MasterdataValue>? Labels { get; set; } = new List<MasterdataValue>();
         public ICollection<Comment> Comments { get; set; } = new List<Comment>();
         public User? Assignee { get; set; }
         public Project? Project { get; set; }

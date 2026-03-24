@@ -1,4 +1,6 @@
-﻿using System.Runtime.InteropServices;
+﻿using Microsoft.EntityFrameworkCore.Metadata.Internal;
+using System.Reflection.Emit;
+using System.Runtime.InteropServices;
 using TaskStorm.Model.DTO.ChatGpt;
 using TaskStorm.Model.Entity;
 using TaskStorm.Model.IssueFolder;
@@ -14,6 +16,10 @@ public class IssueCnv
 
     public IssueDto EntityToDto(Issue Issue)
     {
+        var labelsStrings = new List<string>();
+        if (Issue.Labels != null) labelsStrings = Issue.Labels.Select(label => label.ToString()).ToList();
+
+
         var issueDto = new IssueDto(
             Issue.Id,
                 Issue.Key.KeyString,
@@ -27,7 +33,9 @@ public class IssueCnv
                 Issue.DueDate,
                 Issue.UpdatedAt,
                 Issue.ProjectId,
-                Issue.TeamId ?? -1
+                Issue.TeamId ?? -1,
+                labelsStrings
+
             );
         
         return issueDto;
