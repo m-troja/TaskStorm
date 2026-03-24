@@ -22,7 +22,6 @@ namespace TaskStorm.Service
         Task DeleteAllIssues();
         Task DeleteIssueByIdAsync(int id, int userId);
         Task<IEnumerable<IssueDto>> GetIssuesByTeamId(int teamId);
-        Task<Issue> UpdateMasterdata(UpdateMasterDataRequest req, int userId);
 
     }
 }

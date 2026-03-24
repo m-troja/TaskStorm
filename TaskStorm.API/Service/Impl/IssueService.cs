@@ -833,19 +833,4 @@ public class IssueService : IIssueService
         throw new NotImplementedException();
     }
 
-    public async Task<Issue> UpdateMasterdata(UpdateMasterDataRequest req, int userId)
-    {
-        var issue = await GetIssueByIdAsync(req.IssueId);
-
-        switch (req.MasterdataType)
-        {
-            case MasterdataType.ISSUE_LABEL:
-                var value = await _db.MasterdataValues.FirstOrDefaultAsync(v => v.Value == req.MasterDataValue && v.Type == req.MasterdataType && v.Code == req.MasterDataCode) ?? throw new BadRequestException("Masterdata value was not found");
-                issue.Labels.Add(value);
-                break;
-        }
-
-        await UpdateIssueAsync(issue);
-        return issue;
-    }
 }
