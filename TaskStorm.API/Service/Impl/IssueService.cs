@@ -701,7 +701,7 @@ public class IssueService : IIssueService
             OldAssigneeId = issue.AssigneeId,
             OldTeamId = issue.TeamId,
             OldDueDate = issue.DueDate,
-            OldLabels = issue.Labels.Where(v => v.Type == MasterdataType.ISSUE_LABEL).ToList()
+            OldLabels = issue.Labels != null ? issue.Labels.Where(v => v.Type == MasterdataType.ISSUE_LABEL).ToList() : new List<MasterdataValue>()
         };
 
         if (req.Title != null)
