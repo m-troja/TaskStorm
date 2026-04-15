@@ -828,9 +828,40 @@ public class IssueService : IIssueService
 
     }
 
-    public Task<Issue> AssignIssuesBySlackAsync(AssignIssueRequestChatGpt uir, int userId)
+    public async Task<Issue> AssignIssuesBySlackAsync(AssignIssueRequestChatGpt req, int userId)
     {
-        throw new NotImplementedException();
+        l.LogDebug($"AssignIssuesBySlackAsync started. Key={req.key}, SlackUserId={req.slackUserId}, UserId={userId}");
+
+        var eventAuthorUser = await _db.Users.FirstOrDefaultAsync(u => u.Id == userId);
+        if (eventAuthorUser == null)
+        {
+            l.LogDebug($"Event author user with ID {userId} was not found");
+            throw new BadRequestException("Event author user was not found");
+        }
+
+        if (string.IsNullOrWhiteSpace(req.key))
+        {
+            throw new BadRequestException("Issue key cannot be empty");
+        }
+
+        if (string.IsNullOrWhiteSpace(req.slackUserId))
+        {
+            throw new BadRequestException("Slack user ID cannot be empty");
+        }
+
+        int issueId = await GetIssueIdFromKey(req.key);
+        l.LogDebug($"Resolved issueId={issueId} from key={req.key}");
+
+        int assigneeId = await _userService.GetIdBySlackUserId(req.slackUserId);
+        l.LogDebug($"Resolved assigneeId={assigneeId} from slackUserId={req.slackUserId}");
+
+        var assignRequest = new AssignIssueRequest(issueId, assigneeId);
+
+        var updatedIssue = await AssignIssueAsync(assignRequest, userId);
+
+        l.LogDebug($"AssignIssuesBySlackAsync completed successfully. IssueId={updatedIssue.Id}, AssigneeId={assigneeId}");
+
+        return updatedIssue;
     }
 
 }

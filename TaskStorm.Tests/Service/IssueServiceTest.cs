@@ -483,6 +483,66 @@ public class IssueServiceTests
             service.CreateIssueAsync(req));
     }
 
+    [Fact]
+    public async Task AssignIssuesBySlackAsync_ShouldAssignIssue()
+    {
+        var db = GetDb();
+        var service = CreateService(db);
+
+        var author = new User("John", "Dev")
+        {
+            Id = 1,
+            SlackUserId = "U_AUTHOR"
+        };
+
+        var assignee = new User("Jane", "Ops")
+        {
+            Id = 2,
+            SlackUserId = "U_ASSIGNEE"
+        };
+
+        var project = new Project("PR", "Test")
+        {
+            Id = 1
+        };
+
+        db.Users.Add(author);
+        db.Users.Add(assignee);
+        db.Projects.Add(project);
+        await db.SaveChangesAsync();
+
+        var issue = await SeedIssue(db, author.Id, 1, project.Id);
+
+        issue.Key.KeyString = "PR-1";
+        issue.AssigneeId = author.Id;
+        issue.Assignee = author;
+
+        await db.SaveChangesAsync();
+
+        _userMock
+            .Setup(x => x.GetIdBySlackUserId("U_ASSIGNEE"))
+            .ReturnsAsync(assignee.Id);
+
+        var req = new AssignIssueRequestChatGpt
+        ("PR-1","U_ASSIGNEE");
+
+        var result = await service.AssignIssuesBySlackAsync(req, author.Id);
+
+        Assert.NotNull(result);
+        Assert.Equal(issue.Id, result.Id);
+        Assert.Equal(assignee.Id, result.AssigneeId);
+
+        _activityMock.Verify(
+            x => x.UpdateAssigneeAsync(author.Id, assignee.Id, issue.Id, author.Id),
+            Times.Once);
+
+        _slackMock.Verify(
+            x => x.SendIssueAssignedNotificationAsync(
+                It.IsAny<Issue>(),
+                It.IsAny<User>()),
+            Times.Once);
+    }
+
 
     private CreateIssueRequest CreateIssueReq(
         string title = "Test Issue",
