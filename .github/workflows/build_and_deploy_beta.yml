@@ -12,14 +12,19 @@ jobs:
 
       - name: Configure SSH
         run: |
-          install -m 600 -D /dev/null ~/.ssh/id_rsa
-          echo "${{ secrets.SSH_PRIVATE_KEY_BETA }}" > ~/.ssh/id_rsa
+          mkdir -p ~/.ssh
+          chmod 700 ~/.ssh
           
-          echo "Host beta-server
+          echo "${{ secrets.SSH_PRIVATE_KEY_BETA }}" > ~/.ssh/id_rsa
+          chmod 600 ~/.ssh/id_rsa
+          
+          cat <<EOF > ~/.ssh/config
+          Host beta-server
             HostName ${{ secrets.SSH_HOST }}
             User ${{ secrets.SSH_USER }}
             Port 6022
-            StrictHostKeyChecking no" > ~/.ssh/config
+            StrictHostKeyChecking no
+          EOF
           
           ssh-keyscan -p 6022 -H ${{ secrets.SSH_HOST }} >> ~/.ssh/known_hosts
 
