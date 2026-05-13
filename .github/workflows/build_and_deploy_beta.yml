@@ -33,8 +33,7 @@ jobs:
           ssh -p ${{ secrets.SSH_PORT_BETA }} -i ~/.ssh/id_ed25519 -o StrictHostKeyChecking=no ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} "
             cat <<EOF > ${{ secrets.WORK_DIR }}/TaskStorm.API/.env
           ${{ secrets.ENV_FILE }}
-          EOF
-          "
+          EOF"
 
       - name: Deploy via Docker Compose
         run: |
