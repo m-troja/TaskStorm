@@ -37,8 +37,8 @@ jobs:
         run: |
           ssh beta-server "
             cd /opt/taskstorm &&
-            docker compose down &&
-            docker compose up -d --build
+            docker-compose down &&
+            docker-compose up -d --build
           "
 
       - name: Cleanup
