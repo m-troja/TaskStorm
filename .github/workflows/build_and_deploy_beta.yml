@@ -18,28 +18,26 @@ jobs:
           echo "${{ secrets.SSH_PRIVATE_KEY_BETA }}" > ~/.ssh/id_ed25519
           chmod 600 ~/.ssh/id_ed25519
           
-          cat <<EOF > ~/.ssh/config
-          Host beta-server
-            HostName ${{ secrets.SSH_HOST }}
-            User ${{ secrets.SSH_USER }}
-            Port 6922
-            StrictHostKeyChecking no
-          EOF
-          
           ssh-keyscan -p 6922 -H ${{ secrets.SSH_HOST }} >> ~/.ssh/known_hosts
 
       - name: Copy files to Beta Server
         run: |
-          rsync -avz --exclude='.git' --exclude='**/bin' --exclude='**/obj' \
-          ./ beta-server:/opt/taskstorm/
+          rsync -avz -e "ssh -p 6922 -i ~/.ssh/id_ed25519 -o StrictHostKeyChecking=no" \
+          --exclude='.git' --exclude='**/bin' --exclude='**/obj' \
+          ./ ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }}:${{ secrets.WORK_DIR }}/
 
       - name: Deploy via Docker Compose
         run: |
-          ssh beta-server "
-            cd /opt/taskstorm &&
-            docker-compose down &&
-            docker-compose up -d --build
+          ssh -p 6922 -i ~/.ssh/id_ed25519 -o StrictHostKeyChecking=no ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} "
+            cd ${{ secrets.WORK_DIR }} && \
+            docker-compose down || true && \
+            docker-compose up -d --build && \
+            docker ps
           "
+
+      - name: Show containers
+        run: |
+          ssh -p 6922 -i ~/.ssh/id_ed25519 -o StrictHostKeyChecking=no ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} "docker ps"
 
       - name: Cleanup
         run: rm -rf ~/.ssh
