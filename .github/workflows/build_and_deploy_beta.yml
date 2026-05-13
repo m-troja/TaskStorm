@@ -22,7 +22,7 @@ jobs:
           Host beta-server
             HostName ${{ secrets.SSH_HOST }}
             User ${{ secrets.SSH_USER }}
-            Port 6022
+            Port 6922
             StrictHostKeyChecking no
           EOF
           
