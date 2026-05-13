@@ -29,12 +29,14 @@ jobs:
           ./ ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }}:${{ secrets.WORK_DIR }}/
 
       - name: Create .env file
+        env:
+          ENV_CONTENT: ${{ secrets.ENV_FILE }}
         run: |
-          ssh -p ${{ secrets.SSH_PORT_BETA }} -i ~/.ssh/id_ed25519 -o StrictHostKeyChecking=no ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} "
-            cat <<'EOF' > ${{ secrets.WORK_DIR }}/TaskStorm.API/.env
-          ${{ secrets.ENV_FILE }}
-          EOF
-          "
+          # Przesyłamy zawartość zmiennej środowiskowej bezpośrednio przez SSH
+          # Używamy cudzysłowów wokół "$ENV_CONTENT", aby zachować znaki specjalne
+          ssh -p ${{ secrets.SSH_PORT_BETA }} -i ~/.ssh/id_ed25519 -o StrictHostKeyChecking=no ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} "cat <<'EOF' > ${{ secrets.WORK_DIR }}/TaskStorm.API/.env
+          $ENV_CONTENT
+          EOF"
 
       - name: Deploy via Docker Compose
         run: |
