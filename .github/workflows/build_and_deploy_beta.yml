@@ -17,8 +17,7 @@ jobs:
           chmod 700 ~/.ssh
           echo "${{ secrets.SSH_PRIVATE_KEY_BETA }}" > ~/.ssh/id_ed25519
           chmod 600 ~/.ssh/id_ed25519
-          # Dodano 'secrets.' przed SSH_PORT_BETA
-          ssh-keyscan -p ${{ secrets.SSH_PORT_BETA }} -H ${{ secrets.SSH_HOST }} >> ~/.ssh/known_hosts
+          ssh-keyscan -p 6922 -H ${{ secrets.SSH_HOST }} >> ~/.ssh/known_hosts
 
       - name: Copy files to Beta Server
         run: |
