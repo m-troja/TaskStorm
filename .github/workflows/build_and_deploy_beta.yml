@@ -26,7 +26,7 @@ jobs:
             StrictHostKeyChecking no
           EOF
           
-          ssh-keyscan -p 6022 -H ${{ secrets.SSH_HOST }} >> ~/.ssh/known_hosts
+          ssh-keyscan -p 6922 -H ${{ secrets.SSH_HOST }} >> ~/.ssh/known_hosts
 
       - name: Copy files to Beta Server
         run: |
