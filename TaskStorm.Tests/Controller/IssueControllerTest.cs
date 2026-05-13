@@ -217,7 +217,8 @@ public class IssueControllerTests
             DateTime.Parse("2030-01-01"),
             DateTime.Now,
             1,
-            1
+            1,
+            new List<string> { "label"}
         );
     }
 

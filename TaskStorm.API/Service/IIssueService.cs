@@ -1,5 +1,5 @@
-﻿using TaskStorm.Model.DTO;
-using TaskStorm.Model.Entity;
+﻿using TaskStorm.Tools;
+using TaskStorm.Model.DTO;
 using TaskStorm.Model.IssueFolder;
 using TaskStorm.Model.Request;
 
@@ -13,7 +13,7 @@ namespace TaskStorm.Service
         Task<Issue> CreateIssueAsync(CreateIssueRequest cir);
         Task<Issue> HandleUpdateIssueRequestAsync(UpdateIssueRequest req, int userId);
         Task<IssueDtoChatGpt> CreateIssueBySlackAsync(SlackCreateIssueRequest scis);
-        Task<Issue> AssignIssuesBySlackAsync(AssignIssueRequestChatGpt uir, int userId);
+        Task<Issue> AssignIssueBySlackAsync(AssignIssueRequestChatGpt uir, int userId);
         Task<IEnumerable<IssueDto>> GetIssuesByUserId(int userId);
         Task<IEnumerable<Issue>> GetIssuesBySlackUserId(string slackUserId);
         Task<IEnumerable<IssueDto>> GetIssuesByProjectId(int projectId);
@@ -22,6 +22,6 @@ namespace TaskStorm.Service
         Task DeleteAllIssues();
         Task DeleteIssueByIdAsync(int id, int userId);
         Task<IEnumerable<IssueDto>> GetIssuesByTeamId(int teamId);
-
+        Task<PagedResult<Issue>> SearchIssuesAsync(IssueSearchCriteria criteria);
     }
 }

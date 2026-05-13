@@ -1,7 +1,4 @@
-﻿using Microsoft.AspNetCore.Mvc;
-using Microsoft.EntityFrameworkCore;
-using Microsoft.VisualBasic;
-using System.ComponentModel.DataAnnotations;
+﻿using Microsoft.EntityFrameworkCore;
 using System.Text;
 using TaskStorm.Data;
 using TaskStorm.Exception;
@@ -14,6 +11,7 @@ using TaskStorm.Model.Entity;
 using TaskStorm.Model.Entity.Masterdata;
 using TaskStorm.Model.IssueFolder;
 using TaskStorm.Model.Request;
+using TaskStorm.Tools;
 
 namespace TaskStorm.Service.Impl;
 
@@ -51,14 +49,14 @@ public class IssueService : IIssueService
         issue.Status = IssueStatus.NEW;
 
         using var transaction = await _db.Database.BeginTransactionAsync();
-       
+
         try
         {
             int maxIdInsideProject = await _db.Issues
                 .Where(i => i.ProjectId == issue.Project.Id)
                 .MaxAsync(i => (int?)i.IdInsideProject) ?? 0;
             l.LogDebug($"Retrieved maxIdInsideProject from DB: {maxIdInsideProject}");
-            l.LogDebug($"issue.Project.Id used in query: {issue.Project.Id}"); 
+            l.LogDebug($"issue.Project.Id used in query: {issue.Project.Id}");
             l.LogDebug($"ProjectId used in query: {issue.ProjectId}");
 
             issue.IdInsideProject = maxIdInsideProject + 1;
@@ -74,12 +72,12 @@ public class IssueService : IIssueService
             await _db.Keys.AddAsync(key);
             await _db.SaveChangesAsync();
             await transaction.CommitAsync();
-            
+
             l.LogDebug($"Created successfully Keystring: {issue.Key.KeyString},  IssueId: {issue.Id}, IdInsideProject: {issue.IdInsideProject}");
 
             var activity = await _activityService.CreateIssueAsync(issue.Id, issue.AuthorId);
         }
-        catch (System.Exception )
+        catch (System.Exception)
         {
             l.LogDebug($"Error occurred while creating issue for project {issue.ProjectId}");
             await transaction.RollbackAsync();
@@ -210,10 +208,10 @@ public class IssueService : IIssueService
     {
         List<MasterdataValue> validatedMasterdata = new List<MasterdataValue>();
 
-        foreach (var masterdata in  masterdataToValidate)
+        foreach (var masterdata in masterdataToValidate)
         {
             if (string.IsNullOrEmpty(masterdata.Value)) throw new BadRequestException("Value cannot be empty");
-            if ( !Enum.IsDefined(typeof(MasterdataType), masterdata.Type))
+            if (!Enum.IsDefined(typeof(MasterdataType), masterdata.Type))
             {
                 l.LogError($"Invalid MasterdataType: {masterdata.Value}");
                 throw new BadRequestException($"Invalid MasterdataType: {masterdata.Type}");
@@ -227,7 +225,7 @@ public class IssueService : IIssueService
     public async Task<IssueDto> GetIssueDtoByIdAsync(int id)
     {
         l.LogDebug($"Fetching issue DTO for issueId {id}");
-        var issue = await GetIssueFromDb(id) ;
+        var issue = await GetIssueFromDb(id);
         l.LogDebug($"Fetching done");
 
         if (issue.Key == null)
@@ -235,7 +233,7 @@ public class IssueService : IIssueService
             l.LogDebug($"issue.key is null :(");
             throw new System.Exception("issue.key is null :(");
         }
-        if(issue.Key.KeyString == null)
+        if (issue.Key.KeyString == null)
         {
             l.LogDebug("issue.Key.KeyString is null :(");
             throw new System.Exception("issue.Key.KeyString is null :(");
@@ -251,7 +249,7 @@ public class IssueService : IIssueService
     public async Task<Issue> GetIssueByIdAsync(int id)
     {
         l.LogDebug($"Fetching issue entity for issueId {id}");
-        Issue? issue = await GetIssueFromDb(id); 
+        Issue? issue = await GetIssueFromDb(id);
 
         l.LogDebug($"Fetched issue: {issue.Id}");
 
@@ -277,20 +275,25 @@ public class IssueService : IIssueService
         }
 
         l.LogDebug($"Assigning issue {req.IssueId} to user {req.AssigneeId}, event author={userId}");
-        var newAssignee = await _db.Users.AnyAsync(u => u.Id == req.AssigneeId) ? await GetUserByIdAsync(req.AssigneeId) : throw new BadRequestException("Assignee user was not found") ;
+        var newAssignee = await _db.Users.AnyAsync(u => u.Id == req.AssigneeId) ? await GetUserByIdAsync(req.AssigneeId) : throw new BadRequestException("Assignee user was not found");
         l.LogDebug($"Fetched new assignee: {newAssignee}");
-        
+
         var issue = await GetIssueFromDb(req.IssueId);
 
         User? oldAssignee;
-        if (issue.AssigneeId.HasValue && issue.AssigneeId != 0) {
-            oldAssignee = await _db.Users.FirstOrDefaultAsync(u => u.Id == issue.AssigneeId); }
-        else  {
+        if (issue.AssigneeId.HasValue && issue.AssigneeId != 0)
+        {
+            oldAssignee = await _db.Users.FirstOrDefaultAsync(u => u.Id == issue.AssigneeId);
+        }
+        else
+        {
             l.LogDebug("Old assignee was null or 0, assigning to system user for activity log");
             oldAssignee = await _db.Users.FirstOrDefaultAsync(u => u.Id == SystemUserId);
-        };
+        }
+        ;
 
-        if (oldAssignee == null) {
+        if (oldAssignee == null)
+        {
             l.LogDebug("System user assignee was not found in database");
             throw new ServerException("System user assignee was not found in database");
         }
@@ -320,7 +323,7 @@ public class IssueService : IIssueService
         int issueId = await GetIssueIdFromKey(req.key);
         int newAssigneeId = await _userService.GetIdBySlackUserId(req.slackUserId);
         var assignIssueRequest = new AssignIssueRequest(issueId, newAssigneeId);
-        var issue = await AssignIssueAsync(assignIssueRequest,userId);
+        var issue = await AssignIssueAsync(assignIssueRequest, userId);
         l.LogDebug($"Assigned issue {issueId} to user {newAssigneeId} successfully");
         return issue;
     }
@@ -336,7 +339,7 @@ public class IssueService : IIssueService
 
         return number;
     }
-    
+
     private async Task<Project> GetProjectFromKey(string key)
     {
         l.LogDebug($"Getting project from key {key}");
@@ -396,7 +399,7 @@ public class IssueService : IIssueService
 
         if (req.NewStatus == null) throw new ArgumentException("NewStatus cannot be null");
         if (req.IssueId <= 0) throw new ArgumentException("IssueId must be positive");
-        if (!Enum.TryParse<IssueStatus>(req.NewStatus, true, out var newStatus)  || !Enum.IsDefined(typeof(IssueStatus), newStatus))
+        if (!Enum.TryParse<IssueStatus>(req.NewStatus, true, out var newStatus) || !Enum.IsDefined(typeof(IssueStatus), newStatus))
         {
             throw new ArgumentException($"Invalid issue status: {req.NewStatus}");
         }
@@ -407,7 +410,7 @@ public class IssueService : IIssueService
 
         var UpdatedIssue = await UpdateIssueAsync(issue);
         IssueDto issueDto = _issueCnv.EntityToDto(UpdatedIssue);
-        
+
         var activity = await _activityService.UpdateStatusAsync(oldStatus, issue.Status, issue.Id, userId);
         await _slackNotificationService.SendIssueStatusChangedNotificationAsync(issue, eventAuthorUser);
 
@@ -435,7 +438,7 @@ public class IssueService : IIssueService
         issue.Priority = Enum.Parse<IssuePriority>(req.NewPriority);
         var UpdatedIssue = await UpdateIssueAsync(issue);
         IssueDto issueDto = _issueCnv.EntityToDto(UpdatedIssue);
-    
+
         var oldPriorityForActivity = oldPriority == null ? IssuePriority.NORMAL : oldPriority.Value;
         var newPriorityForActivity = issue.Priority == null ? IssuePriority.NORMAL : issue.Priority.Value;
 
@@ -465,7 +468,7 @@ public class IssueService : IIssueService
         IssueDto issueDto = _issueCnv.EntityToDto(UpdatedIssue);
         l.LogDebug($"Assigned team {team.Name} to issue {issue.Id} successfully");
 
-        var activity = await _activityService.UpdateTeamAsync(oldTeamId,  team.Id, issue.Id, userId);
+        var activity = await _activityService.UpdateTeamAsync(oldTeamId, team.Id, issue.Id, userId);
         await _slackNotificationService.SendTeamAssignedNotificationAsync(issue, eventAuthorUser);
         return issueDto;
     }
@@ -488,7 +491,7 @@ public class IssueService : IIssueService
     {
         l.LogDebug($"GetIssuesBySlackUserId for slackUserId {slackUserId}");
         var user = await _db.Users.FirstOrDefaultAsync(u => u.SlackUserId == slackUserId) ?? throw new UserNotFoundException("User was not found by slackUserId");
-        var issueIds = await _db.Issues.Where(i => i.AssigneeId == user.Id ).Select(i => i.Id).ToListAsync();
+        var issueIds = await _db.Issues.Where(i => i.AssigneeId == user.Id).Select(i => i.Id).ToListAsync();
 
         var issues = await GetListOfIssuesFromDb(issueIds);
 
@@ -499,7 +502,7 @@ public class IssueService : IIssueService
     public async Task<IEnumerable<IssueDto>> GetIssuesByTeamId(int teamId)
     {
         l.LogDebug($"Getting all issues for teamId {teamId}");
-        var team = await _db.Teams.FirstOrDefaultAsync( team => team.Id == teamId) ?? throw new ContentNotFoundException("Team was not found");
+        var team = await _db.Teams.FirstOrDefaultAsync(team => team.Id == teamId) ?? throw new ContentNotFoundException("Team was not found");
 
         var issueIds = await _db.Issues.Where(i => i.TeamId == teamId).Select(i => i.Id).ToListAsync();
         var issues = await GetListOfIssuesFromDb(issueIds);
@@ -544,11 +547,11 @@ public class IssueService : IIssueService
         l.LogDebug($"Set due date {issue.DueDate} for issue {issue.Id}");
         var updatedIssue = await UpdateIssueAsync(issue);
         await _slackNotificationService.SendIssueDueDateUpdatedNotificationAsync(updatedIssue, eventAuthorUser);
-        
+
         var oldDueDate = issue.DueDate.HasValue ? issue.DueDate.Value : DateTime.MinValue;
         var newDueDate = updatedIssue.DueDate.HasValue ? updatedIssue.DueDate.Value : DateTime.MinValue;
 
-        var activity = await _activityService.UpdateDueDateAsync(oldDueDate , newDueDate, issue.Id, userId);
+        var activity = await _activityService.UpdateDueDateAsync(oldDueDate, newDueDate, issue.Id, userId);
         return _issueCnv.EntityToDto(updatedIssue);
     }
 
@@ -570,7 +573,7 @@ public class IssueService : IIssueService
              authorId,
              assigneeId,
              req.dueDate,
-             req.projectId != null ? req.projectId.Value : DummyProjectId   
+             req.projectId != null ? req.projectId.Value : DummyProjectId
          );
         var issue = await CreateIssueAsync(createIssueRequest);
         var issueDto = _issueCnv.EntityToIssueDtoChatGpt(issue);
@@ -601,23 +604,23 @@ public class IssueService : IIssueService
         {
             throw new IssueNotFoundException("Issue was not found - skip deleting issue");
         }
-        var author = await  _db.Users.FirstOrDefaultAsync(u => u.Id == issue.AuthorId);
+        var author = await _db.Users.FirstOrDefaultAsync(u => u.Id == issue.AuthorId);
         if (author == null)
         {
             throw new BadRequestException("Author user was not found - skip deleting issue");
         }
 
 
-         _db.Issues.Remove(issue);
+        _db.Issues.Remove(issue);
         await _db.SaveChangesAsync();
-        
+
         l.LogInformation($"Deleted issue where Id={id}");
         await _slackNotificationService.SendIssueDeletedNotificationAsync(issue, author);
         l.LogInformation($"Sent issue deleted notification for issue ID {id} to ChatGPT");
 
     }
 
-    public async Task<Issue> UpdateDescriptionAsync( UpdateDescriptionRequest req, int userId)
+    public async Task<Issue> UpdateDescriptionAsync(UpdateDescriptionRequest req, int userId)
     {
         var issue = await GetIssueFromDb(req.issueId);
         if (issue == null)
@@ -628,7 +631,7 @@ public class IssueService : IIssueService
         var oldDesc = issue.Description;
 
         issue.Description = req.newDescription;
-        
+
         var updatedIssue = await UpdateIssueAsync(issue);
         await _slackNotificationService.SendUpdateDescriptionAsync(updatedIssue, user);
 
@@ -734,7 +737,7 @@ public class IssueService : IIssueService
         if (req.MasterDataValues != null)
         {
             newMasterdata = await ValidateMasterData(req.MasterDataValues);
-            issue.Labels = newMasterdata.Where(  v => v.Type == MasterdataType.ISSUE_LABEL ).ToList();
+            issue.Labels = newMasterdata.Where(v => v.Type == MasterdataType.ISSUE_LABEL).ToList();
         }
 
 
@@ -828,40 +831,82 @@ public class IssueService : IIssueService
 
     }
 
-    public async Task<Issue> AssignIssuesBySlackAsync(AssignIssueRequestChatGpt req, int userId)
+    public async Task<PagedResult<Issue>> SearchIssuesAsync(IssueSearchCriteria criteria)
     {
-        l.LogDebug($"AssignIssuesBySlackAsync started. Key={req.key}, SlackUserId={req.slackUserId}, UserId={userId}");
+        IQueryable<Issue> query = _db.Issues.AsNoTracking(); // dont trace changes
 
-        var eventAuthorUser = await _db.Users.FirstOrDefaultAsync(u => u.Id == userId);
-        if (eventAuthorUser == null)
+
+        // filters
+
+        if (criteria.ProjectId.HasValue)
+            query = query.Where(x => x.ProjectId == criteria.ProjectId);
+
+        if (criteria.AuthorId.HasValue)
+            query = query.Where(x => x.AuthorId == criteria.AuthorId);
+
+        if (criteria.AssigneeId.HasValue)
+            query = query.Where(x => x.AssigneeId == criteria.AssigneeId);
+
+        if (criteria.Status.HasValue)
+            query = query.Where(x => x.Status == criteria.Status);
+
+        if (criteria.Priority.HasValue)
+            query = query.Where(x => x.Priority == criteria.Priority);
+
+        if (criteria.CreatedFrom.HasValue)
+            query = query.Where(x => x.CreatedAt >= criteria.CreatedFrom);
+
+        if (criteria.CreatedTo.HasValue)
+            query = query.Where(x => x.CreatedAt <= criteria.CreatedTo);
+
+        if (!string.IsNullOrWhiteSpace(criteria.Description))
+            query = query.Where(x => x.Description.Contains(criteria.Description));
+
+        query = criteria.SortBy?.ToLower() switch
         {
-            l.LogDebug($"Event author user with ID {userId} was not found");
-            throw new BadRequestException("Event author user was not found");
-        }
 
-        if (string.IsNullOrWhiteSpace(req.key))
+            "createdat" => criteria.IsDescending
+                ? query.OrderByDescending(x => x.CreatedAt)
+                : query.OrderBy(x => x.CreatedAt),
+
+
+            "priority" => criteria.IsDescending
+                ? query.OrderByDescending(x => x.Priority)
+                : query.OrderBy(x => x.Priority),
+
+            "status" => criteria.IsDescending
+                ? query.OrderByDescending(x => x.Status)
+                : query.OrderBy(x => x.Status),
+
+            "assignee" => criteria.IsDescending
+                ? query.OrderByDescending(x => x.Assignee.LastName)
+                : query.OrderBy(x => x.Assignee.LastName),
+
+            _ => criteria.IsDescending
+                ? query.OrderByDescending(x => x.CreatedAt)
+                : query.OrderBy(x => x.CreatedAt)
+        };
+
+        var totalCount = await query.CountAsync();
+
+        var ids = await query
+            .Skip((criteria.PageNumber - 1) * criteria.PageSize)
+            .Take(criteria.PageSize)
+            .Select(x => x.Id)
+            .ToListAsync();
+
+        var items = await GetListOfIssuesFromDb(ids);
+
+        var sortedItems = items.OrderBy(i => ids.IndexOf(i.Id)).ToList();
+
+        var dtos = _issueCnv.EntityListToDtoList(sortedItems);
+
+        return new PagedResult<Issue>
         {
-            throw new BadRequestException("Issue key cannot be empty");
-        }
-
-        if (string.IsNullOrWhiteSpace(req.slackUserId))
-        {
-            throw new BadRequestException("Slack user ID cannot be empty");
-        }
-
-        int issueId = await GetIssueIdFromKey(req.key);
-        l.LogDebug($"Resolved issueId={issueId} from key={req.key}");
-
-        int assigneeId = await _userService.GetIdBySlackUserId(req.slackUserId);
-        l.LogDebug($"Resolved assigneeId={assigneeId} from slackUserId={req.slackUserId}");
-
-        var assignRequest = new AssignIssueRequest(issueId, assigneeId);
-
-        var updatedIssue = await AssignIssueAsync(assignRequest, userId);
-
-        l.LogDebug($"AssignIssuesBySlackAsync completed successfully. IssueId={updatedIssue.Id}, AssigneeId={assigneeId}");
-
-        return updatedIssue;
+            Items = sortedItems,
+            TotalCount = totalCount,
+            PageNumber = criteria.PageNumber,
+            PageSize = criteria.PageSize
+        };
     }
-
 }

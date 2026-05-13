@@ -41,7 +41,7 @@ public class ChatGptController : ControllerBase
         int userId = int.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
 
         l.LogInformation($"Received AssignIssueBySlack request: {req}, userId={userId}");
-        var issue = await _iss.AssignIssuesBySlackAsync(req, userId);
+        var issue = await _iss.AssignIssueBySlackAsync(req, userId);
         return _issueCnv.EntityToIssueDtoChatGpt(issue);
     }
 

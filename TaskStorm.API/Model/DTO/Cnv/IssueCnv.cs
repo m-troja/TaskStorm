@@ -4,6 +4,7 @@ using System.Runtime.InteropServices;
 using TaskStorm.Model.DTO.ChatGpt;
 using TaskStorm.Model.Entity;
 using TaskStorm.Model.IssueFolder;
+using TaskStorm.Tools;
 
 namespace TaskStorm.Model.DTO.Cnv;
 
@@ -40,6 +41,8 @@ public class IssueCnv
         
         return issueDto;
     }
+
+
     public IssueDtoChatGpt EntityToIssueDtoChatGpt(Issue Issue)
     {
         logger.LogDebug($"Converting {Issue} to IssueDtoChatGpt");
@@ -66,7 +69,7 @@ public class IssueCnv
         logger.LogInformation($"Converted IssueId: {Issue.Id} to {issueDto}");
         return issueDto;
     }
-    public List<IssueDto> EntityListToDtoList(List<Issue> issues)
+    public List<IssueDto> EntityListToDtoList(IEnumerable<Issue> issues)
     {
         var issueDtos = new List<IssueDto>();
         foreach (var issue in issues)
@@ -75,6 +78,7 @@ public class IssueCnv
         }
         return issueDtos;
     }
+
 
     public List<IssueDtoChatGpt> EntityListToChatGptDtoList(IEnumerable<Issue> issues)
     {

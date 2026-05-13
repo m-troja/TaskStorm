@@ -150,17 +150,22 @@ namespace TaskStorm.Tests.Controller
         private List<IssueDto> BuildListOfIssueDto()
         {
             var issue1 = new IssueDto(1, "ISSUE-1", "Title1", "Desc1", IssueStatus.NEW,
-                        IssuePriority.HIGH, 1, 2, 
-                        DateTime.Parse("2025-11-22"), 
-                        DateTime.Parse("2025-11-23"), 
+                        IssuePriority.HIGH, 1, 2,
+                        DateTime.Parse("2025-11-22"),
+                        DateTime.Parse("2025-11-23"),
                         DateTime.Parse("2025-11-24"),
-                        1, 1);
+                        1, 1,
+                        new List<string> { "label" }
+                        );
             var issue2 = new IssueDto(2, "ISSUE-2", "Title2", "Desc2", IssueStatus.NEW,
                         IssuePriority.HIGH, 1, 2, 
                         DateTime.Parse("2025-11-25"),
                         DateTime.Parse("2025-11-26"),
                         DateTime.Parse("2025-11-27"),
-                        1, 1);
+                        1, 
+                        1,
+                        new List<string> { "label" }
+);
             return new List<IssueDto> { issue1, issue2 };
         }
     }

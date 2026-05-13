@@ -3,14 +3,12 @@ using Microsoft.AspNetCore.Mvc;
 using System.Security.Claims;
 using TaskStorm.Exception;
 using TaskStorm.Exception.IssueException;
-using TaskStorm.Log;
 using TaskStorm.Model.DTO;
 using TaskStorm.Model.DTO.Cnv;
 using TaskStorm.Model.IssueFolder;
 using TaskStorm.Model.Request;
-using TaskStorm.Model.Response;
 using TaskStorm.Service;
-using TaskStorm.Service.Impl;
+using TaskStorm.Tools;
 
 namespace TaskStorm.Controller;
 
@@ -153,6 +151,22 @@ public class IssueController : ControllerBase
         var dtos = _activityCnv.EntityListToDtoList(activities);
         return Ok(dtos);
     }
+
+    [HttpGet("search")]
+    public async Task<ActionResult<PagedResult<IssueDto>>> SearchIssues([FromQuery] IssueSearchCriteria criteria)
+    {
+        l.LogDebug($"Received search issues request with criteria: {criteria}");
+        var issues = await _is.SearchIssuesAsync(criteria);
+        var dtos = _issueCnv.EntityListToDtoList(issues.Items);
+        return Ok(new PagedResult<IssueDto>
+        {
+            Items = dtos,
+            TotalCount = issues.TotalCount,
+            PageNumber = issues.PageNumber,
+            PageSize = issues.PageSize
+        });
+    }
+
 
     public IssueController(IIssueService @is, ILogger<IssueController> l, IssueCnv _issueCnv, IActivityService _activityService, ActivityCnv activityCnv)
     {
