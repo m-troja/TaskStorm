@@ -1,8 +1,6 @@
 ﻿using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Http.Features;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.Configuration;
-using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.FileProviders;
 using Microsoft.IdentityModel.Tokens;
 using Serilog;
@@ -21,20 +19,20 @@ using MassTransit;
 using TaskStorm.Event.Consumers;
 using TaskStorm.Event.Hubs;
 
-// Load env variables
-DotNetEnv.Env.Load("dev.env");
+if (File.Exists("dev.env"))
+{
+    DotNetEnv.Env.Load("dev.env");
+}
+
 var _LogDir = Environment.GetEnvironmentVariable("TS_LOG_DIR") ?? "/home/michal";
 var _LogFilename = Environment.GetEnvironmentVariable("TS_LOG_FILENAME") ?? "log";
 var _HttpPort = Environment.GetEnvironmentVariable("TS_HTTP_PORT") ?? "6901";
 var _LogPath = Path.Combine(_LogDir, _LogFilename);
 
 // -------------------
-// Configure Serilog
+//  Serilog
 // -------------------
 Log.Logger = new LoggerConfiguration()
-
-    // Debug (including all below)
-
     .MinimumLevel.Debug()
     .MinimumLevel.Override("Microsoft.EntityFrameworkCore", Serilog.Events.LogEventLevel.Warning)
     .MinimumLevel.Override("Microsoft.AspNetCore.Mvc", Serilog.Events.LogEventLevel.Information)
@@ -48,8 +46,6 @@ Log.Logger = new LoggerConfiguration()
         outputTemplate: "[{Timestamp:yyyy-MM-dd HH:mm:ss} {Level:u3}] {Message:lj}{NewLine}{Exception}",
         shared: true
     )
-
-    // Error
     .WriteTo.File(
         Path.Combine(_LogDir, _LogFilename + ".error"),
         rollingInterval: RollingInterval.Day,
@@ -60,8 +56,6 @@ Log.Logger = new LoggerConfiguration()
         outputTemplate: "[{Timestamp:yyyy-MM-dd HH:mm:ss} {Level:u3}] {Message:lj}{NewLine}{Exception}",
         shared: true
     )
-
-    //  Info (Info + Error) 
     .WriteTo.File(
         Path.Combine(_LogDir, _LogFilename + ".info"),
         rollingInterval: RollingInterval.Day,
@@ -72,7 +66,6 @@ Log.Logger = new LoggerConfiguration()
         outputTemplate: "[{Timestamp:yyyy-MM-dd HH:mm:ss} {Level:u3}] {Message:lj}{NewLine}{Exception}",
         shared: true
     )
-
     .CreateLogger();
 
 try
@@ -80,16 +73,17 @@ try
     Log.Information("Starting TaskStorm WebApplication...");
 
     var builder = WebApplication.CreateBuilder(args);
-    DotNetEnv.Env.Load("dev.env");
+
+    builder.Configuration.AddEnvironmentVariables();
 
     // -------------------
-    // JWT Config
+    // JWT 
     // -------------------
-    var jwtSecret = Environment.GetEnvironmentVariable("JWT_SECRET")
+    var jwtSecret = builder.Configuration["Jwt:Secret"] ?? builder.Configuration["JWT_SECRET"]
         ?? throw new InvalidOperationException("JWT secret not configured.");
-    var jwtIssuer = Environment.GetEnvironmentVariable("JWT_ISSUER")
+    var jwtIssuer = builder.Configuration["Jwt:Issuer"] ?? builder.Configuration["JWT_ISSUER"]
         ?? throw new InvalidOperationException("JWT issuer not configured.");
-    var jwtAudience = Environment.GetEnvironmentVariable("JWT_AUDIENCE")
+    var jwtAudience = builder.Configuration["Jwt:Audience"] ?? builder.Configuration["JWT_AUDIENCE"]
         ?? throw new InvalidOperationException("JWT audience not configured.");
 
     JwtSecurityTokenHandler.DefaultInboundClaimTypeMap.Clear();
@@ -107,16 +101,12 @@ try
         {
             ValidateIssuer = true,
             ValidIssuer = jwtIssuer,
-
             ValidateAudience = true,
             ValidAudience = jwtAudience,
-
             ValidateLifetime = true,
             ClockSkew = TimeSpan.FromMinutes(1),
-
             ValidateIssuerSigningKey = true,
             IssuerSigningKey = new SymmetricSecurityKey(key),
-
             NameClaimType = ClaimTypes.NameIdentifier,
             RoleClaimType = ClaimTypes.Role
         };
@@ -128,7 +118,7 @@ try
                 var accessToken = context.Request.Query["access_token"];
                 var path = context.Request.Path;
 
-                if (!string.IsNullOrEmpty(accessToken) && path.StartsWithSegments("/notificationsHub"))
+                if (!string.IsNullOrEmpty(accessToken) && path.StartsWithSegments("/notificationHub"))
                 {
                     context.Token = accessToken;
                 }
@@ -138,34 +128,33 @@ try
     });
 
     builder.Services.AddAuthorization();
-
-    // -------------------
-    // Replace default logging with Serilog
-    // -------------------
     builder.Host.UseSerilog();
 
     // -------------------
-    // Register services
+    // Register Database
     // -------------------
     builder.Services.AddDbContext<PostgresqlDbContext>(options =>
     {
-        var dbName = Environment.GetEnvironmentVariable("TS_DB_NAME") ?? "TaskStorm";
-        var dbHost = Environment.GetEnvironmentVariable("TS_DB_HOST") ?? "localhost";
-        var dbPort = Environment.GetEnvironmentVariable("TS_DB_PORT") ?? "5432";
-        var dbUser = Environment.GetEnvironmentVariable("TS_DB_USER") ?? "postgres";
-        var dbPassword = Environment.GetEnvironmentVariable("TS_DB_PASSWORD") ?? "postgres";
+        var connectionString = builder.Configuration.GetConnectionString("DefaultConnection");
 
-        Log.Information("DB Host: {Host}:{Port}", dbHost, dbPort);
-        Log.Information("DB User: {User}", dbUser);
-        Log.Information("DB Name: {dbName}", dbName);
+        if (string.IsNullOrEmpty(connectionString))
+        {
+            var dbName = builder.Configuration["TS_DB_NAME"] ?? "taskstorm";
+            var dbHost = builder.Configuration["TS_DB_HOST"] ?? "localhost";
+            var dbPort = builder.Configuration["TS_DB_PORT"] ?? "5432";
+            var dbUser = builder.Configuration["TS_DB_USER"] ?? "task_user";
+            var dbPassword = builder.Configuration["TS_DB_PASSWORD"] ?? "taskstorm";
 
-        var connectionString =
-            $"Host={dbHost};Port={dbPort};Database={dbName};Username={dbUser};Password={dbPassword};SearchPath=public";
+            connectionString = $"Host={dbHost};Port={dbPort};Database={dbName};Username={dbUser};Password={dbPassword};SearchPath=public";
+        }
 
-        options.UseNpgsql(connectionString)
-               .UseSnakeCaseNamingConvention();
+        Log.Information("Initializing Database Connection...");
+        options.UseNpgsql(connectionString).UseSnakeCaseNamingConvention();
     });
 
+    // -------------------
+    // Dependency Injection
+    // -------------------
     builder.Services.AddScoped<IUserService, UserService>();
     builder.Services.AddScoped<IActivityService, ActivityService>();
     builder.Services.AddScoped<ICommentService, CommentService>();
@@ -198,36 +187,28 @@ try
         options.JsonSerializerOptions.Converters.Add(new JsonStringEnumConverter());
     });
 
-    // -------------------
-    // Swagger
-    // -------------------
     builder.Services.AddEndpointsApiExplorer();
     builder.Services.AddSwaggerGen();
 
-    // ALLOW CORS
+    // -------------------
+    // CORS 
+    // -------------------
     builder.Services.AddCors(options =>
     {
         options.AddPolicy("FrontendCorsPolicy", policy =>
         {
-            policy.WithOrigins("http://localhost:3000") // React
+            policy.WithOrigins("http://localhost:3000")
                   .AllowAnyMethod()
                   .AllowAnyHeader()
-                  .AllowCredentials(); 
-        });
-        options.AddPolicy("SignalrCorsPolicy", policy =>
-        {
-            policy.AllowAnyHeader()
-                  .AllowAnyMethod()
-                  .SetIsOriginAllowed(origin => true)
-                  .AllowCredentials(); 
+                  .AllowCredentials();
         });
     });
 
-    // SignalR
     builder.Services.AddSignalR();
 
-
-    //  MASSTRANSIT & RABBITMQ
+    // -------------------
+    // MassTransit & RabbitMQ 
+    // -------------------
     builder.Services.AddMassTransit(x =>
     {
         x.AddConsumer<IssueEventsConsumer>();
@@ -235,8 +216,10 @@ try
         x.UsingRabbitMq((context, cfg) =>
         {
             var rabbitHost = builder.Configuration["RabbitMQ:Host"] ?? "localhost";
-            var username = builder.Configuration["RabbitMQ:Username"] ?? "guest";
-            var password = builder.Configuration["RabbitMQ:Password"] ?? "guest";
+            var username = builder.Configuration["RabbitMQ:Username"] ?? "admin";
+            var password = builder.Configuration["RabbitMQ:Password"] ?? "admin";
+
+            Log.Information("Connecting MassTransit to RabbitMQ Host: {Host}", rabbitHost);
 
             cfg.Host(rabbitHost, "/", h =>
             {
@@ -248,48 +231,35 @@ try
         });
     });
 
-
-    // set url before build()
     builder.WebHost.UseUrls($"http://0.0.0.0:{_HttpPort}");
 
-
-
-    // File upload limits
-
+    // File upload size limits 
     builder.Services.Configure<FormOptions>(options =>
     {
         options.MultipartBodyLengthLimit = 10 * 1024 * 1024; // 10MB
     });
     builder.WebHost.ConfigureKestrel(options =>
     {
-        options.Limits.MaxRequestBodySize = 10 * 1024 * 1024;  // 10MB
+        options.Limits.MaxRequestBodySize = 10 * 1024 * 1024; // 10MB
     });
-
-    // Logging
 
     builder.Logging.AddDebug();
     builder.Logging.AddConsole();
 
-    // Build the app
-
     var app = builder.Build();
 
-    // Files
-
+    // Ensure static files directory structure exists
     var uploadRoot = Path.Combine(app.Environment.ContentRootPath, "uploads");
-
     if (!Directory.Exists(uploadRoot))
         Directory.CreateDirectory(uploadRoot);
 
     app.UseStaticFiles(new StaticFileOptions
     {
-        FileProvider = new PhysicalFileProvider(
-        Path.Combine(app.Environment.ContentRootPath, "uploads")),
+        FileProvider = new PhysicalFileProvider(uploadRoot),
         RequestPath = "/uploads"
     });
 
-
-    // migrations
+    // Automatically apply database schema migrations on container startup
     using (var scope = app.Services.CreateScope())
     {
         var db = scope.ServiceProvider.GetRequiredService<PostgresqlDbContext>();
@@ -297,15 +267,16 @@ try
     }
 
     app.UseMiddleware<GlobalExceptionHandler>();
-
     app.UseRouting();
+
+    // Enable unified CORS policy globally
     app.UseCors("FrontendCorsPolicy");
+
     app.UseAuthentication();
     app.UseAuthorization();
     app.UseStaticFiles();
     app.MapControllers();
 
-    // WEBSOCKET ENDPOINT
     app.MapHub<NotificationHub>("/notificationHub");
 
     if (app.Environment.IsDevelopment())
@@ -315,17 +286,13 @@ try
     }
 
     Log.Information($"TaskStorm WebApplication started successfully on port {_HttpPort}");
-
-
     app.Run();
 }
 catch (Exception ex)
-{ 
+{
     Log.Fatal(ex, "Application terminated unexpectedly!");
     throw;
 }
-
-
 finally
 {
     Log.CloseAndFlush();

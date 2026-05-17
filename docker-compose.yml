@@ -1,0 +1,6 @@
+services:
+  taskstorm.api:
+    image: taskstormapi
+    build:
+      context: .
+      dockerfile: TaskStorm.API/Dockerfile

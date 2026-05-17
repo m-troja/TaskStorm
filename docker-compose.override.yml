@@ -31,7 +31,7 @@ services:
 
   taskstorm.api:
     build:
-      context: ./TaskStorm.API  
+      context: ./TaskStorm.API
       dockerfile: Dockerfile
 
     container_name: taskstorm-api-local
@@ -70,6 +70,7 @@ services:
       RabbitMQ__Port: "5672"
       RabbitMQ__Username: admin
       RabbitMQ__Password: admin
+      ConnectionStrings:DefaultConnection: "Host=host.docker.internal;Port=5432;Database=taskstorm;Username=task_user;Password=taskstorm"
 
     volumes:
       - C:/tmp/docker/taskstorm/logs:/app/logs
