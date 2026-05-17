@@ -17,12 +17,11 @@ public class IssueChanges
     public IssuePriority? OldPriority { get; set; }
     public IssuePriority? NewPriority { get; set; }
 
-    public int? OldAssigneeId { get; set; }
-    public int? NewAssigneeId { get; set; }
+    public User? OldAssignee { get; set; }
+    public User? NewAssignee { get; set; }
 
     public int? OldTeamId { get; set; }
     public int? NewTeamId { get; set; }
-
     public DateTime? OldDueDate { get; set; }
     public DateTime? NewDueDate { get; set; }
     public ICollection<MasterdataValue>? OldLabels { get; set; }

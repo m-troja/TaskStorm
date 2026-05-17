@@ -3,7 +3,9 @@ using Microsoft.Extensions.Options;
 using System;
 using System.Reflection.Emit;
 using System.Text;
+using System.Text.Json;
 using TaskStorm.Controller;
+using TaskStorm.Event;
 using TaskStorm.Log;
 using TaskStorm.Model.Entity;
 using TaskStorm.Model.Entity.Masterdata;
@@ -26,6 +28,7 @@ public class PostgresqlDbContext : DbContext
     public DbSet<Team> Teams { get; set; }
     public DbSet<CommentAttachment> Attachments { get; set; }
     public DbSet<MasterdataValue> MasterdataValues { get; set; }
+    public DbSet<Notification> Notifications { get; set; }
     public PostgresqlDbContext(DbContextOptions<PostgresqlDbContext> options)
         : base(options)
     {
@@ -237,6 +240,14 @@ public class PostgresqlDbContext : DbContext
             entity.ToTable("masterdata_values");
         });
 
+        // Notification
+        modelBuilder.Entity<Notification>()
+            .Property(x => x.Properties)
+            .HasColumnType("jsonb")
+            .HasConversion(
+                v => JsonSerializer.Serialize(v, (JsonSerializerOptions)null),
+                v => JsonSerializer.Deserialize<Dictionary<string, string>>(v, (JsonSerializerOptions)null)!
+            );
 
         // Seed roles
         modelBuilder.Entity<Role>().HasData(

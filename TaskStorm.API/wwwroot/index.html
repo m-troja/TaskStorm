@@ -1,0 +1,109 @@
+﻿<!DOCTYPE html>
+<html lang="pl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TaskStorm - Aktywne Powiadomienia</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/microsoft-signalr/8.0.0/signalr.min.js"></script>
+    <style>
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #f4f6f9; color: #333; margin: 30px; }
+        .container { max-width: 600px; background: white; padding: 20px; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
+        h2 { color: #2c3e50; border-bottom: 2px solid #ecf0f1; padding-bottom: 10px; }
+        .notification-list { list-style: none; padding: 0; }
+        .notification-item { background: #e8f4fd; margin-bottom: 10px; padding: 12px 15px; border-left: 5px solid #3498db; border-radius: 4px; display: flex; justify-content: space-between; align-items: center; animation: fadeIn 0.5s ease; }
+        .notification-item.unread { background: #fff9db; border-left-color: #f1c40f; }
+        .time { font-size: 0.8em; color: #7f8c8d; }
+        .status-badge { font-size: 0.8em; background: #3498db; color: white; padding: 3px 8px; border-radius: 12px; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(-10px); } to { opacity: 1; transform: translateY(0); } }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h2> Nieodczytane powiadomienia</h2>
+    <div id="connection-status" style="color: gray; font-size: 0.9em; margin-bottom: 15px;"> laczenie z WebSocket...</div>
+    <ul id="notifications" class="notification-list">
+    </ul>
+</div>
+
+<script>
+    const API_URL = "http://localhost:5167";
+	const LOGIN_URL = "/api/v1/auth/login"; 
+	const NOTIFICATIONS_API = "/api/v1/notifications/me?qty=10";
+	const WS_URL = "/notificationHub";    
+    const AUTH_TOKEN = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJuYW1laWQiOiIxIiwicm9sZSI6IlJPTEVfVVNFUiIsIm5iZiI6MTc3OTA0MDA4NywiZXhwIjoxNzc5MDQzNjg3LCJpYXQiOjE3NzkwNDAwODcsImlzcyI6IlRhc2stU3lzdGVtIiwiYXVkIjoiVGFzay1TeXN0ZW0tVXNlcnMifQ.oeLY7lzIc7y5zC9wxPwFPDjz-AXM9IqCasFCVQhpFKU"; 
+
+    const listElement = document.getElementById('notifications');
+    const statusElement = document.getElementById('connection-status');
+
+    function addNotificationToList(notification, isNew = false) {
+        const li = document.createElement('li');
+        li.className = `notification-item ${!notification.isRead ? 'unread' : ''}`;
+        
+        li.innerHTML = `
+            <div>
+                <strong>${notification.title || 'Powiadomienie'}</strong>
+                <div>${notification.message || notification.content || JSON.stringify(notification)}</div>
+            </div>
+            <span class="time">${notification.createdAt ? new Date(notification.createdAt).toLocaleTimeString() : 'Teraz'}</span>
+        `;
+
+        if (isNew) {
+            listElement.insertBefore(li, listElement.firstChild); 
+        } else {
+            listElement.appendChild(li);
+        }
+    }
+
+    async function fetchInitialNotifications() {
+        try {
+            const response = await fetch(`${API_URL}/api/v1/notifications/me?qty=10`, {
+                headers: { 'Authorization': `Bearer ${AUTH_TOKEN}` }
+            });
+            
+            if (response.status === 204) {
+                listElement.innerHTML = '<li>Brak nowych powiadomien.</li>';
+                return;
+            }
+
+            const data = await response.json();
+            listElement.innerHTML = ''; // Wyczyszczenie loaderow
+            
+            const items = data.items || data;
+            items.forEach(notification => addNotificationToList(notification));
+        } catch (err) {
+            console.error("Blad podczas pobierania powiadomien z API:", err);
+            listElement.innerHTML = '<li style="color:red">Nie udalo sie pobrac powiadomien z API.</li>';
+        }
+    }
+
+    const connection = new signalR.HubConnectionBuilder()
+        .withUrl(WS_URL, {
+            accessTokenFactory: () => AUTH_TOKEN // Przekazanie tokenu w naglowku WebSocket
+        })
+        .withAutomaticReconnect()
+        .build();
+
+    connection.on("ReceiveNotification", function (notification) {
+        console.log("Otrzymano powiadomienie przez WS:", notification);
+        addNotificationToList(notification, true);
+    });
+
+    async function startSignalR() {
+        try {
+            await connection.start();
+            statusElement.innerText = " Polaczono z WebSocket (SignalR)";
+            statusElement.style.color = "green";
+        } catch (err) {
+            console.error("Blad polaczenia z SignalR:", err);
+            statusElement.innerText = " Rozlazono. Sprawddz CORS / Adres Hub'a.";
+            statusElement.style.color = "red";
+            setTimeout(startSignalR, 5000); 
+        }
+    }
+
+    fetchInitialNotifications();
+    startSignalR();
+</script>
+</body>
+</html>

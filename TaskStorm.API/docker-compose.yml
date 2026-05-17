@@ -24,6 +24,22 @@ services:
       - TS_DB_NAME=taskstorm
       - TS_DB_USER=taskstorm 
       - TS_DB_PASSWORD=${TS_DB_PASSWORD}
+      - RabbitMQ__Host=rabbitmq
+      - RabbitMQ__Username=admin
+      - RabbitMQ__Password=admin
     volumes:
-      - ./beta-data/logs:/app/logs
-      - ./beta-data/uploads:/app/uploads
+      - ./data/logs:/app/logs
+      - ./data/uploads:/app/uploads
+    depends_on:
+      - rabbitmq
+
+  rabbitmq:
+    image: rabbitmq:3-management
+    container_name: taskstorm-rabbitmq
+    restart: unless-stopped
+    ports:
+      - "5672:5672" # AMQP
+      - "15672:15672" # management panel
+    volumes:
+      - ./data/rabbitmq-data:/var/lib/rabbitmq 
+      - /var/log:/var/log:Z

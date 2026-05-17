@@ -1,6 +1,8 @@
-﻿using Microsoft.EntityFrameworkCore;
+﻿using MassTransit;
+using Microsoft.EntityFrameworkCore;
 using System.Text;
 using TaskStorm.Data;
+using TaskStorm.Event;
 using TaskStorm.Exception;
 using TaskStorm.Exception.IssueException;
 using TaskStorm.Exception.ProjectException;
@@ -26,14 +28,16 @@ public class IssueService : IIssueService
     private readonly ILogger<IssueService> l;
     private readonly IActivityService _activityService;
     private readonly ISlackNotificationService _slackNotificationService;
+    private readonly IPublishEndpoint _publishEndpoint;
 
     public IssueService(PostgresqlDbContext db, IUserService userService, CommentCnv commentCnv, IssueCnv issueCnv, ILogger<IssueService> l,
-        IActivityService activityService, ISlackNotificationService slackNotificationService)
+        IActivityService activityService, ISlackNotificationService slackNotificationService, IPublishEndpoint publishEndpoint)
     {
         _db = db;
         _userService = userService;
         _commentCnv = commentCnv;
         _issueCnv = issueCnv;
+        _publishEndpoint = publishEndpoint;
         this.l = l;
         _activityService = activityService;
         _slackNotificationService = slackNotificationService;
@@ -74,8 +78,8 @@ public class IssueService : IIssueService
             await transaction.CommitAsync();
 
             l.LogDebug($"Created successfully Keystring: {issue.Key.KeyString},  IssueId: {issue.Id}, IdInsideProject: {issue.IdInsideProject}");
+            _ = _publishEndpoint.Publish(new IssueCreatedEvent(issue));
 
-            var activity = await _activityService.CreateIssueAsync(issue.Id, issue.AuthorId);
         }
         catch (System.Exception)
         {
@@ -85,7 +89,6 @@ public class IssueService : IIssueService
         }
         l.LogDebug($"Issue creation transaction completed successfully for issue ID {issue.Id}");
 
-        await _slackNotificationService.SendIssueCreatedNotificationAsync(issue, issue.Author);
 
         l.LogDebug($"Sent issue created notification for issue ID {issue.Id}");
 
@@ -290,7 +293,6 @@ public class IssueService : IIssueService
             l.LogDebug("Old assignee was null or 0, assigning to system user for activity log");
             oldAssignee = await _db.Users.FirstOrDefaultAsync(u => u.Id == SystemUserId);
         }
-        ;
 
         if (oldAssignee == null)
         {
@@ -305,9 +307,8 @@ public class IssueService : IIssueService
         Issue updatedIssue = await UpdateIssueAsync(issue);
         l.LogDebug($"Updated issue {updatedIssue.Id} in database");
 
-        var activity = await _activityService.UpdateAssigneeAsync(oldAssignee.Id, newAssignee.Id, issue.Id, userId);
-        await _slackNotificationService.SendIssueAssignedNotificationAsync(issue, eventAuthorUser);
-        l.LogDebug($"Sent issue assigned notification for issue {issue.Id} to ChatGPT");
+        _ = _publishEndpoint.Publish(new IssueAssignedEvent(issue.Id, oldAssignee.Id, newAssignee.Id, userId, issue.Key.KeyString, oldAssignee.FirstName + " " + oldAssignee.LastName, newAssignee.FirstName + " " + newAssignee.LastName, issue.Title, eventAuthorUser.FirstName + " " + eventAuthorUser.LastName));
+
         return updatedIssue;
     }
     public async Task<Issue> AssignIssueBySlackAsync(AssignIssueRequestChatGpt req, int userId)
@@ -457,18 +458,19 @@ public class IssueService : IIssueService
         }
 
         l.LogDebug($"Assigning team {req.TeamId} to issue {req.IssueId}, userId={userId}");
-        Team team = await _db.Teams.FirstOrDefaultAsync(t => t.Id == req.TeamId) ?? throw new ContentNotFoundException("Team was not found");
+        Team newTeam = await _db.Teams.FirstOrDefaultAsync(t => t.Id == req.TeamId) ?? throw new ContentNotFoundException("Team was not found");
         Issue issue = await GetIssueFromDb(req.IssueId);
         var oldTeamId = issue.TeamId.HasValue ? issue.TeamId.Value : -1;
+        var oldTeam = issue.Team ?? new Team("Old dummy team");
 
-        issue.Team = team;
-        issue.TeamId = team.Id;
+        issue.Team = newTeam;
+        issue.TeamId = newTeam.Id;
 
         var UpdatedIssue = await UpdateIssueAsync(issue);
         IssueDto issueDto = _issueCnv.EntityToDto(UpdatedIssue);
-        l.LogDebug($"Assigned team {team.Name} to issue {issue.Id} successfully");
+        l.LogDebug($"Assigned team {newTeam.Name} to issue {issue.Id} successfully");
 
-        var activity = await _activityService.UpdateTeamAsync(oldTeamId, team.Id, issue.Id, userId);
+        var activity = await _activityService.UpdateTeamAsync(oldTeamId, newTeam.Id, issue.Id, userId);
         await _slackNotificationService.SendTeamAssignedNotificationAsync(issue, eventAuthorUser);
         return issueDto;
     }
@@ -701,7 +703,7 @@ public class IssueService : IIssueService
             OldDescription = issue.Description,
             OldStatus = issue.Status,
             OldPriority = issue.Priority,
-            OldAssigneeId = issue.AssigneeId,
+            OldAssignee = issue.Assignee,
             OldTeamId = issue.TeamId,
             OldDueDate = issue.DueDate,
             OldLabels = issue.Labels != null ? issue.Labels.Where(v => v.Type == MasterdataType.ISSUE_LABEL).ToList() : new List<MasterdataValue>()
@@ -747,7 +749,7 @@ public class IssueService : IIssueService
         changes.NewDescription = issue.Description;
         changes.NewStatus = issue.Status;
         changes.NewPriority = issue.Priority;
-        changes.NewAssigneeId = issue.AssigneeId;
+        changes.NewAssignee = issue.Assignee;
         changes.NewTeamId = issue.TeamId;
         changes.NewDueDate = issue.DueDate;
         changes.NewLabels = newMasterdata;
@@ -794,15 +796,18 @@ public class IssueService : IIssueService
             await _slackNotificationService.SendIssuePriorityChangedNotificationAsync(issue, eventAuthor);
         }
 
-        if (c.OldAssigneeId != c.NewAssigneeId)
+        if (c.OldAssignee?.Id != c.NewAssignee?.Id)
         {
-            await _activityService.UpdateAssigneeAsync(c.OldAssigneeId ?? -1, c.NewAssigneeId ?? -1, issue.Id, eventAuthor.Id);
-            await _slackNotificationService.SendIssueAssignedNotificationAsync(issue, eventAuthor);
+            var oldName = c.OldAssignee != null ? $"{c.OldAssignee.FirstName} {c.OldAssignee.LastName}" : "Unassigned";
+            var newName = c.NewAssignee != null ? $"{c.NewAssignee.FirstName} {c.NewAssignee.LastName}" : "Unassigned";
+            var authorName = $"{eventAuthor.FirstName} {eventAuthor.LastName}";
+
+            _ = _publishEndpoint.Publish(new IssueAssignedEvent(issue.Id, c.OldAssignee?.Id ?? 0, c.NewAssignee?.Id ?? 0, eventAuthor.Id, issue.Key.KeyString, oldName, newName, issue.Title, authorName));
         }
 
         if (c.OldTeamId != c.NewTeamId)
         {
-            await _activityService.UpdateTeamAsync(c.OldTeamId ?? -1, c.NewTeamId ?? -1, issue.Id, eventAuthor.Id);
+            await _activityService.UpdateTeamAsync(c.OldTeamId ?? 0, c.NewTeamId ?? 0, issue.Id, eventAuthor.Id);
             await _slackNotificationService.SendTeamAssignedNotificationAsync(issue, eventAuthor);
         }
 

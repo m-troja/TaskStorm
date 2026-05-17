@@ -1,5 +1,5 @@
-﻿namespace TaskStorm.Model.DTO.ChatGpt;
-public enum ChatGptEvent
+﻿namespace TaskStorm.Event;
+public enum EventType
 {
     ISSUE_CREATED,
     ISSUE_ASSIGNED,

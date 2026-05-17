@@ -17,6 +17,9 @@ using TaskStorm.Security;
 using TaskStorm.Security.Impl;
 using TaskStorm.Service;
 using TaskStorm.Service.Impl;
+using MassTransit;
+using TaskStorm.Event.Consumers;
+using TaskStorm.Event.Hubs;
 
 // Load env variables
 DotNetEnv.Env.Load("dev.env");
@@ -118,6 +121,20 @@ try
             RoleClaimType = ClaimTypes.Role
         };
 
+        options.Events = new JwtBearerEvents
+        {
+            OnMessageReceived = context =>
+            {
+                var accessToken = context.Request.Query["access_token"];
+                var path = context.Request.Path;
+
+                if (!string.IsNullOrEmpty(accessToken) && path.StartsWithSegments("/notificationsHub"))
+                {
+                    context.Token = accessToken;
+                }
+                return Task.CompletedTask;
+            }
+        };
     });
 
     builder.Services.AddAuthorization();
@@ -165,6 +182,8 @@ try
     builder.Services.AddScoped<IMasterdataService, MasterdataService>();
     builder.Services.AddHttpClient<IChatGptService, ChatGptService>();
     builder.Services.AddHttpClient<ISlackNotificationService, SlackNotificationService>();
+    builder.Services.AddScoped<TaskStorm.Service.INotificationService, TaskStorm.Service.Impl.NotificationService>();
+
     builder.Services.AddScoped<UserCnv>();
     builder.Services.AddScoped<TeamCnv>();
     builder.Services.AddScoped<CommentCnv>();
@@ -172,7 +191,6 @@ try
     builder.Services.AddScoped<ProjectCnv>();
     builder.Services.AddScoped<RefreshTokenCnv>();
     builder.Services.AddScoped<ActivityCnv>();
-    builder.Services.AddScoped<ISlackNotificationService, SlackNotificationService>();
     builder.Services.AddScoped<IFileService, FileService>();
 
     builder.Services.AddControllers().AddJsonOptions(options =>
@@ -189,12 +207,47 @@ try
     // ALLOW CORS
     builder.Services.AddCors(options =>
     {
-        options.AddPolicy("AllowAll",
-            policy => policy
-                .AllowAnyOrigin()
-                .AllowAnyMethod()
-                .AllowAnyHeader());
+        options.AddPolicy("FrontendCorsPolicy", policy =>
+        {
+            policy.WithOrigins("http://localhost:3000") // React
+                  .AllowAnyMethod()
+                  .AllowAnyHeader()
+                  .AllowCredentials(); 
+        });
+        options.AddPolicy("SignalrCorsPolicy", policy =>
+        {
+            policy.AllowAnyHeader()
+                  .AllowAnyMethod()
+                  .SetIsOriginAllowed(origin => true)
+                  .AllowCredentials(); 
+        });
     });
+
+    // SignalR
+    builder.Services.AddSignalR();
+
+
+    //  MASSTRANSIT & RABBITMQ
+    builder.Services.AddMassTransit(x =>
+    {
+        x.AddConsumer<IssueEventsConsumer>();
+
+        x.UsingRabbitMq((context, cfg) =>
+        {
+            var rabbitHost = builder.Configuration["RabbitMQ:Host"] ?? "localhost";
+            var username = builder.Configuration["RabbitMQ:Username"] ?? "guest";
+            var password = builder.Configuration["RabbitMQ:Password"] ?? "guest";
+
+            cfg.Host(rabbitHost, "/", h =>
+            {
+                h.Username(username);
+                h.Password(password);
+            });
+
+            cfg.ConfigureEndpoints(context);
+        });
+    });
+
 
     // set url before build()
     builder.WebHost.UseUrls($"http://0.0.0.0:{_HttpPort}");
@@ -246,10 +299,14 @@ try
     app.UseMiddleware<GlobalExceptionHandler>();
 
     app.UseRouting();
-    app.UseCors("AllowAll");
+    app.UseCors("FrontendCorsPolicy");
     app.UseAuthentication();
     app.UseAuthorization();
+    app.UseStaticFiles();
     app.MapControllers();
+
+    // WEBSOCKET ENDPOINT
+    app.MapHub<NotificationHub>("/notificationHub");
 
     if (app.Environment.IsDevelopment())
     {
