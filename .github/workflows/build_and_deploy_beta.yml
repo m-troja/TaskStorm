@@ -15,39 +15,30 @@ jobs:
         run: |
           mkdir -p ~/.ssh
           chmod 700 ~/.ssh
-          
-          printf "%s\n" "${{ secrets.SSH_PRIVATE_KEY_BETA }}" > ~/.ssh/id_ed25519
+          echo "${{ secrets.SSH_PRIVATE_KEY_BETA }}" > ~/.ssh/id_ed25519
           chmod 600 ~/.ssh/id_ed25519
-          
-          echo "Host *" > ~/.ssh/config
-          echo "  StrictHostKeyChecking no" >> ~/.ssh/config
+          ssh-keyscan -p ${{ secrets.SSH_PORT_BETA }} -H "${{ secrets.SSH_HOST }}" >> ~/.ssh/known_hosts
+
+      - name: Create .env locally
+        run: |
+          echo "${{ secrets.ENV_FILE }}" > ./TaskStorm.API/.env
 
       - name: Copy files to Beta Server
         run: |
-          rsync -avz -e "ssh -p ${{ secrets.SSH_PORT_BETA }} -i ~/.ssh/id_ed25519 -o StrictHostKeyChecking=no" \
+          rsync -avz -e "ssh -p ${{ secrets.SSH_PORT_BETA }} -i ~/.ssh/id_ed25519" \
           --exclude='.git' --exclude='**/bin' --exclude='**/obj' \
           ./ ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }}:${{ secrets.WORK_DIR }}/
 
-      - name: Create .env file
-        env:
-          ENV_CONTENT: ${{ secrets.ENV_FILE }}
+      - name: Deploy via Docker Compose (Near Zero-Downtime)
         run: |
-          # Używamy cudzysłowów wokół "$ENV_CONTENT", aby zachować znaki specjalne
-          ssh -p ${{ secrets.SSH_PORT_BETA }} -i ~/.ssh/id_ed25519 -o StrictHostKeyChecking=no ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} "cat <<'EOF' > ${{ secrets.WORK_DIR }}/TaskStorm.API/.env
-          $ENV_CONTENT
-          EOF"
-
-      - name: Deploy via Docker Compose
-        run: |
-          ssh -p ${{ secrets.SSH_PORT_BETA }} -i ~/.ssh/id_ed25519 -o StrictHostKeyChecking=no ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} "
+          ssh -p ${{ secrets.SSH_PORT_BETA }} -i ~/.ssh/id_ed25519 ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} "
             cd ${{ secrets.WORK_DIR }}/TaskStorm.API && \
-            docker-compose down || true && \
-            docker-compose up -d --build
+            docker-compose up -d --build --remove-orphans
           "
 
-      - name: Show containers
+      - name: Show containers status
         run: |
-          ssh -p ${{ secrets.SSH_PORT_BETA }} -i ~/.ssh/id_ed25519 -o StrictHostKeyChecking=no ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} "docker ps"
+          ssh -p ${{ secrets.SSH_PORT_BETA }} -i ~/.ssh/id_ed25519 ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} "cd ${{ secrets.WORK_DIR }}/TaskStorm.API && docker-compose ps"
 
       - name: Cleanup
         run: rm -rf ~/.ssh
