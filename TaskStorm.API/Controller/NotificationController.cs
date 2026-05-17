@@ -18,11 +18,11 @@ public class NotificationController : ControllerBase
     private readonly INotificationService _NotificationService;
 
     [HttpGet("me")]
-    public async Task<ActionResult<PagedResult<Notification>>> GetUserNotifications([FromQuery] int qty)
+    public async Task<ActionResult<PagedResult<Notification>>> GetUserNotifications([FromQuery] int qty, [FromQuery] bool read)
     {
         int userId = int.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
 
-        var notifications = await _NotificationService.GetNotificationsForUserAsync(userId, qty);
+        var notifications = await _NotificationService.GetNotificationsForUserAsync(userId, qty, read);
         if (notifications == null || !notifications.Items.Any()) return new EmptyResult();
 
         return Ok(notifications);
