@@ -49,11 +49,11 @@ services:
       RABBITMQ_DEFAULT_USER: admin
       RABBITMQ_DEFAULT_PASS: ${TS_RABBITMQ_PASSWORD}
     healthcheck:
-      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      test: ["CMD-SHELL", "nc -z localhost 5672 || exit 1"]
       interval: 10s 
       timeout: 5s
       retries: 5
-      start_period: 15s
+      start_period: 30s
     volumes:
       - ./data/rabbitmq-data:/var/lib/rabbitmq 
       - ./data/rabbitmq-logs:/var/log/rabbitmq 
