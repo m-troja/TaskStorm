@@ -20,3 +20,4 @@ TaskStorm/bin
 /TaskStorm.API/uploads/projects
 /TaskStorm.Tests/bin
 /TaskStorm.Tests/dev.env
+/TaskStorm.API/Data/logs
