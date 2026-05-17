@@ -55,5 +55,5 @@ services:
       retries: 5
       start_period: 30s
     volumes:
-      - ./data/rabbitmq-data:/var/lib/rabbitmq 
-      - ./data/rabbitmq-logs:/var/log/rabbitmq
+      - ./data/rabbitmq-data:/var/lib/rabbitmq:z
+      - ./data/rabbitmq-logs:/var/log/rabbitmq:z
