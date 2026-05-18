@@ -32,8 +32,8 @@ services:
       - RabbitMQ__Username=admin
       - RabbitMQ__Password=${TS_RABBITMQ_PASSWORD}
     volumes:
-      - /var/log/taskstorm:/app/logs              
-      - /var/data/taskstorm/uploads:/app/uploads   
+      - /var/log/taskstorm/api:/app/logs:z
+      - /var/data/taskstorm/uploads:/app/uploads:z
     depends_on:
       rabbitmq:
         condition: service_healthy 
@@ -56,4 +56,4 @@ services:
        start_period: 30s    
     volumes:
       - /var/data/taskstorm/rabbitmq:/var/lib/rabbitmq:z 
-      - /var/log/taskstorm/rabbitmq:/var/log/rabbitmq:z   
+      - /var/log/taskstorm/rabbitmq:/var/log/rabbitmq:z
