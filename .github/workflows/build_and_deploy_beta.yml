@@ -31,15 +31,14 @@ jobs:
         run: |
           rsync -avz -e "ssh -p ${{ secrets.SSH_PORT_BETA }} -i ~/.ssh/id_ed25519" \
           --exclude='.git' --exclude='**/bin' --exclude='**/obj' \
-          ./ ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }}:${{ secrets.WORK_DIR }}/TaskStorm.API
+          ./ ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }}:${{ secrets.WORK_DIR }}/TaskStorm
 
       - name: Deploy via Docker Compose (Near Zero-Downtime)
         run: |
           ssh -p ${{ secrets.SSH_PORT_BETA }} -i ~/.ssh/id_ed25519 ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} "
-            cd ${{ secrets.WORK_DIR }}/TaskStorm.API && \
+            cd ${{ secrets.WORK_DIR }}/TaskStorm && \
             docker-compose up -d --build --remove-orphans
           "
-
       - name: Show containers status
         run: |
           ssh -p ${{ secrets.SSH_PORT_BETA }} -i ~/.ssh/id_ed25519 ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} "cd ${{ secrets.WORK_DIR }}/TaskStorm.API && docker-compose ps"
