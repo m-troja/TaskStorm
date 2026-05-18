@@ -1,6 +1,7 @@
 docker-compose.override.yml
 docker-compose.local.yml
 /TaskStorm.API/docker-compose.local.yml
+/TaskStorm.API/docker-compose.override.yml
 dev.env
 .git
 .vs
