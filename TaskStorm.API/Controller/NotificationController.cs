@@ -23,7 +23,7 @@ public class NotificationController : ControllerBase
         int userId = int.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
 
         var notifications = await _NotificationService.GetNotificationsForUserAsync(userId, qty, read);
-        if (notifications == null || !notifications.Items.Any()) return new EmptyResult();
+        if (notifications == null || !notifications.Items.Any()) return new NoContentResult();
 
         return Ok(notifications);
     }
