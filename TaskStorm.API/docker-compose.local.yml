@@ -37,7 +37,7 @@ services:
     container_name: taskstorm-api-local
 
     ports:
-      - "5167:6901"
+      - "6901:6901"
 
     depends_on:
       rabbitmq.local:
