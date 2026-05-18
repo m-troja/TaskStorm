@@ -15,9 +15,9 @@ services:
       - TS_LOG_DIR=/app/logs
       - TS_LOG_FILENAME=taskstorm
       
-      - JWT__SECRET=${JWT_SECRET}
-      - JWT__ISSUER=${JWT_ISSUER}
-      - JWT__AUDIENCE=${JWT_AUDIENCE}
+      - JWT_SECRET=${JWT_SECRET}
+      - JWT_ISSUER=${JWT_ISSUER}
+      - JWT_AUDIENCE=${JWT_AUDIENCE}
       
       - TS_DB_HOST=host.docker.internal
       - TS_DB_PORT=5432
