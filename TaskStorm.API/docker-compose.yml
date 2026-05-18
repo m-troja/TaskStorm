@@ -27,10 +27,10 @@ services:
       
       - ConnectionStrings__DefaultConnection=Host=host.docker.internal;Port=5432;Database=taskstorm;Username=taskstorm;Password=${TS_DB_PASSWORD}
       
-      - RabbitMQ__Host=rabbitmq
-      - RabbitMQ__Port=5672
-      - RabbitMQ__Username=admin
-      - RabbitMQ__Password=${TS_RABBITMQ_PASSWORD}
+      - RABBITMQ_HOST=rabbitmq
+      - RABBITMQ_PORT=5672
+      - RABBITMQ_USERNAME=admin
+      - RABBITMQ_PASSWORD=${TS_RABBITMQ_PASSWORD}
     volumes:
       - /var/log/taskstorm/api:/app/logs:z
       - /var/data/taskstorm/uploads:/app/uploads:z

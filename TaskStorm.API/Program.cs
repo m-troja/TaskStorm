@@ -79,11 +79,11 @@ try
     // -------------------
     // JWT 
     // -------------------
-    var jwtSecret = builder.Configuration["Jwt:Secret"] ?? builder.Configuration["JWT_SECRET"]
+    var jwtSecret = builder.Configuration["JWT_SECRET"] ?? builder.Configuration["Jwt:Secret"]
         ?? throw new InvalidOperationException("JWT secret not configured.");
-    var jwtIssuer = builder.Configuration["Jwt:Issuer"] ?? builder.Configuration["JWT_ISSUER"]
+    var jwtIssuer = builder.Configuration["JWT_ISSUER"] ?? builder.Configuration["Jwt:Issuer"]
         ?? throw new InvalidOperationException("JWT issuer not configured.");
-    var jwtAudience = builder.Configuration["Jwt:Audience"] ?? builder.Configuration["JWT_AUDIENCE"]
+    var jwtAudience = builder.Configuration["JWT_AUDIENCE"] ?? builder.Configuration["Jwt:Audience"]
         ?? throw new InvalidOperationException("JWT audience not configured.");
 
     JwtSecurityTokenHandler.DefaultInboundClaimTypeMap.Clear();
@@ -215,9 +215,9 @@ try
 
         x.UsingRabbitMq((context, cfg) =>
         {
-            var rabbitHost = builder.Configuration["RabbitMQ:Host"] ?? "localhost";
-            var username = builder.Configuration["RabbitMQ:Username"] ?? "admin";
-            var password = builder.Configuration["RabbitMQ:Password"] ?? "admin";
+            var rabbitHost = builder.Configuration["RABBITMQ_HOST"] ?? builder.Configuration["RabbitMQ:Host"] ?? "localhost";
+            var username = builder.Configuration["RABBITMQ_USERNAME"] ?? builder.Configuration["RabbitMQ:Username"] ?? "admin";
+            var password = builder.Configuration["RABBITMQ_PASSWORD"] ?? builder.Configuration["RabbitMQ:Password"] ?? "admin";
 
             Log.Information("Connecting MassTransit to RabbitMQ Host: {Host}", rabbitHost);
 
