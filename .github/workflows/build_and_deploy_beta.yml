@@ -36,13 +36,13 @@ jobs:
       - name: Deploy via Docker Compose (Near Zero-Downtime)
         run: |
           ssh -p ${{ secrets.SSH_PORT_BETA }} -i ~/.ssh/id_ed25519 ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} "
-            cd ${{ secrets.WORK_DIR }}/TaskStorm.API && \
+            cd ${{ secrets.WORK_DIR }} && \
             docker-compose up -d --build --remove-orphans
           "
 
       - name: Show containers status
         run: |
-          ssh -p ${{ secrets.SSH_PORT_BETA }} -i ~/.ssh/id_ed25519 ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} "cd ${{ secrets.WORK_DIR }}/TaskStorm.API && docker-compose ps"
+          ssh -p ${{ secrets.SSH_PORT_BETA }} -i ~/.ssh/id_ed25519 ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} "cd ${{ secrets.WORK_DIR }} && docker-compose ps"
 
       - name: Cleanup
         run: rm -rf ~/.ssh
