@@ -118,7 +118,7 @@ if ($testResult -ne 0) {
 
 Write-Host "`n=== ENDPOINTS ===" -ForegroundColor Cyan
 
-Write-Host "API:      http://localhost:5167"
+Write-Host "API:      http://localhost:6901"
 Write-Host "RabbitMQ: http://localhost:15672"
 Write-Host "Logs:     C:\tmp\docker\"
 

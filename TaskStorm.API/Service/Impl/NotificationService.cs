@@ -16,14 +16,31 @@ public class NotificationService : INotificationService
             _db = db;
         }
     
-        public async Task<PagedResult<Notification>> GetNotificationsForUserAsync(int userId, int qty, bool read)
+        public async Task<PagedResult<Notification>> GetNotificationsForUserAsync(int userId, int qty, bool unread)
         {
-            l.LogDebug($"Fetching notifications for user with ID: {userId}");
+            l.LogDebug($"Fetching notifications for user with ID: {userId}, unread: {unread}, quantity: {qty}");
 
-            var notifications = await _db.Notifications.Where ( n => n.UserId == userId && n.IsRead == read)
-            .OrderByDescending(n => n.CreatedAt)
-            .Take(qty)
-            .ToListAsync();
+        List<Notification> notifications = null!;
+        if (qty == 0)  qty = 5;
+
+        switch (unread)
+        {
+            case true: 
+              notifications = await _db.Notifications.Where(n => n.UserId == userId && n.IsRead == unread)
+                .OrderByDescending(n => n.CreatedAt)
+                .Take(qty)
+                .ToListAsync();
+
+            break;
+
+            case false:
+                notifications = await _db.Notifications.Where(n => n.UserId == userId)
+                .OrderByDescending(n => n.CreatedAt)
+                .Take(qty)
+                .ToListAsync();
+
+                break;
+        }
 
             l.LogDebug($"Retrieved {notifications.Count()} notifications for user with ID: {userId}");
             

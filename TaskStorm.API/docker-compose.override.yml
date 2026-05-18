@@ -3,26 +3,21 @@ services:
   rabbitmq.local:
     image: rabbitmq:3-management-alpine
     container_name: taskstorm-rabbitmq-local
-
     ports:
       - "5672:5672"
       - "15672:15672"
-
     environment:
       RABBITMQ_DEFAULT_USER: admin
       RABBITMQ_DEFAULT_PASS: admin
-
     volumes:
       - rabbitmq-data:/var/lib/rabbitmq
-      - C:/tmp/docker/rabbitmq/logs:/var/log/rabbitmq
-
+      - C:/tmp/docker/rabbitmq/logs:/var/log/rabbitmq 
     healthcheck:
       test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
       interval: 5s
       timeout: 5s
       retries: 10
       start_period: 10s
-
     logging:
       driver: json-file
       options:
@@ -33,16 +28,13 @@ services:
     build:
       context: ./TaskStorm.API
       dockerfile: Dockerfile
-
     container_name: taskstorm-api-local
-
+    user: root 
     ports:
       - "6901:6901"
-
     depends_on:
       rabbitmq.local:
         condition: service_healthy
-
     environment:
       ASPNETCORE_ENVIRONMENT: Development
       ASPNETCORE_URLS: http://+:6901
@@ -53,10 +45,6 @@ services:
       JWT_SECRET: "NA32hq4SJCKN(*@!QJ)2/%3E@QCc1sdvV#SDVCV21"
       JWT_ISSUER: Task-System
       JWT_AUDIENCE: Task-System-Users
-
-      Jwt__Secret: "NA32hq4SJCKN(*@!QJ)2/%3E@QCc1sdvV#SDVCV21"
-      Jwt__Issuer: Task-System
-      Jwt__Audience: Task-System-Users
 
       TS_DB_HOST: host.docker.internal
       TS_DB_PORT: "5432"
@@ -70,12 +58,9 @@ services:
       RabbitMQ__Port: "5672"
       RabbitMQ__Username: admin
       RabbitMQ__Password: admin
-      ConnectionStrings:DefaultConnection: "Host=host.docker.internal;Port=5432;Database=taskstorm;Username=task_user;Password=taskstorm"
-
     volumes:
-      - C:/tmp/docker/taskstorm/logs:/app/logs
-      - C:/tmp/docker/taskstorm/uploads:/app/uploads
-
+      - C:/tmp/docker/taskstorm/logs:/app/logs     
+      - C:/tmp/docker/taskstorm/uploads:/app/uploads 
     logging:
       driver: json-file
       options:

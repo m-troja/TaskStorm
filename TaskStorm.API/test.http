@@ -1,0 +1,8 @@
+# For more info on HTTP files go to https://aka.ms/vs/httpfile
+POST http://localhost:5167/api/v1/login
+Content-Type: application/json
+
+{
+  "email": "mtroja98@gmail.com",
+  "password": "strong_password"
+}
