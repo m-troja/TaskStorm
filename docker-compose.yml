@@ -1,6 +1,61 @@
+version: '3.8'
+
 services:
-  taskstorm.api:
-    image: taskstormapi
+  taskstorm-api:
     build:
       context: .
       dockerfile: TaskStorm.API/Dockerfile
+    container_name: taskstorm-api
+    restart: unless-stopped
+    ports:
+      - "6901:6901"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Development
+      - ASPNETCORE_URLS=http://+:6901 
+      - TS_LOG_DIR=/app/logs
+      - TS_LOG_FILENAME=taskstorm
+      
+      - JWT_SECRET=${JWT_SECRET}
+      - JWT_ISSUER=${JWT_ISSUER}
+      - JWT_AUDIENCE=${JWT_AUDIENCE}
+      
+      - TS_DB_HOST=host.docker.internal
+      - TS_DB_PORT=5432
+      - TS_DB_NAME=taskstorm
+      - TS_DB_USER=taskstorm 
+      - TS_DB_PASSWORD=${TS_DB_PASSWORD}
+      
+      - ConnectionStrings__DefaultConnection=Host=host.docker.internal;Port=5432;Database=taskstorm;Username=taskstorm;Password=${TS_DB_PASSWORD}
+      
+      - RABBITMQ_HOST=rabbitmq
+      - RABBITMQ_PORT=5672
+      - RABBITMQ_USERNAME=admin
+      - RABBITMQ_PASSWORD=${TS_RABBITMQ_PASSWORD}
+    volumes:
+      - /var/log/taskstorm/api:/app/logs:z
+      - /var/data/taskstorm/uploads:/app/uploads:z
+    depends_on:
+      rabbitmq:
+        condition: service_healthy 
+
+  rabbitmq:
+    image: rabbitmq:3-management-alpine
+    container_name: taskstorm-rabbitmq
+    restart: unless-stopped
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    environment:
+      RABBITMQ_DEFAULT_USER: admin
+      RABBITMQ_DEFAULT_PASS: ${TS_RABBITMQ_PASSWORD}
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 30s    
+    volumes:
+      - /var/data/taskstorm/rabbitmq:/var/lib/rabbitmq:z 
+      - /var/log/taskstorm/rabbitmq:/var/log/rabbitmq:z

@@ -25,7 +25,7 @@ jobs:
         env:
           ENV_CONTENT: ${{ secrets.ENV_FILE }}
         run: |
-          echo "$ENV_CONTENT" > ./TaskStorm.API/.env
+          echo "$ENV_CONTENT" > .env
 
       - name: Copy files to Beta Server
         run: |
@@ -39,9 +39,10 @@ jobs:
             cd ${{ secrets.WORK_DIR }}/TaskStorm && \
             docker-compose up -d --build --remove-orphans
           "
+
       - name: Show containers status
         run: |
-          ssh -p ${{ secrets.SSH_PORT_BETA }} -i ~/.ssh/id_ed25519 ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} "cd ${{ secrets.WORK_DIR }}/TaskStorm.API && docker-compose ps"
+          ssh -p ${{ secrets.SSH_PORT_BETA }} -i ~/.ssh/id_ed25519 ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} "cd ${{ secrets.WORK_DIR }}/TaskStorm && docker-compose ps"
 
       - name: Cleanup
         run: rm -rf ~/.ssh

@@ -1,10 +1,11 @@
 FROM mcr.microsoft.com/dotnet/sdk:10.0 AS build
 WORKDIR /src
 
-COPY ["TaskStorm.API.csproj", "./"]
-RUN dotnet restore "TaskStorm.API.csproj"
+COPY ["TaskStorm.API/TaskStorm.API.csproj", "TaskStorm.API/"]
+RUN dotnet restore "TaskStorm.API/TaskStorm.API.csproj"
 
 COPY . .
+WORKDIR "/src/TaskStorm.API"
 
 RUN dotnet publish "TaskStorm.API.csproj" -c Release -o /app/publish /p:UseAppHost=false
 
