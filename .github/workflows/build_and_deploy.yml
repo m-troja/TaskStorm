@@ -6,7 +6,7 @@ on:
       - main
 
 jobs:
-  deploy-beta:
+  deploy-prod:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4

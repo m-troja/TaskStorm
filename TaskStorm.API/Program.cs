@@ -197,8 +197,7 @@ try
     {
         options.AddPolicy("FrontendCorsPolicy", policy =>
         {
-            policy.WithOrigins("http://localhost:3000")
-                  .AllowAnyMethod()
+            policy.WithOrigins("http://localhost:3000", "http://komuna.site").AllowAnyMethod()
                   .AllowAnyHeader()
                   .AllowCredentials();
         });
