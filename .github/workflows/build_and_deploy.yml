@@ -1,57 +1,48 @@
-name: Build and version
+name: Build and Deploy to Prod
+
 on:
   push:
-    tags:
-      - "*"
+    branches:
+      - main
+
 jobs:
-  build:
+  deploy-beta:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-      - name: Install .NET
-        uses: actions/setup-dotnet@v4
-        with:
-          dotnet-version: 10.0.x
-      - name: Install GitVersion
-        uses: gittools/actions/gitversion/setup@v3
-        with:
-          versionSpec: "5.x"
-      - name: Run GitVersion
-        id: gitversion
-        uses: gittools/actions/gitversion/execute@v2
-      - name: Build
-        run: |
-           dotnet build TaskStorm.API/TaskStorm.API.csproj \
-             --configuration Release \
-             /p:Version=${{ steps.gitversion.outputs.fullSemVer }} \
-             /p:AssemblyVersion=${{ steps.gitversion.outputs.majorMinorPatch }} \
-             /p:FileVersion=${{ steps.gitversion.outputs.majorMinorPatch }} \
-             /p:InformationalVersion=${{ steps.gitversion.outputs.fullSemVer }}      
-      - name: Show build output
-        run: ls -R TaskStorm.API/bin/Release/
-      - name: Install SSH keys
-        run: |
-          install -m 600 -D /dev/null ~/.ssh/id_rsa
-          echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/id_rsa
-          ssh-keyscan -H ${{ secrets.SSH_HOST }} > ~/.ssh/known_hosts
 
-      - name: Upload build via rsync
+      - name: Configure SSH
+        env:
+          SSH_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
         run: |
-          VERSION=${{ steps.gitversion.outputs.fullSemVer }}
-          ssh ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} "
-          mkdir -p '${{ secrets.WORK_DIR }}/$VERSION';
-          if [ -L '${{ secrets.WORK_DIR }}/latest' ]; then
-            unlink '${{ secrets.WORK_DIR }}/latest';
-          fi
-          ln -s '$VERSION' '${{ secrets.WORK_DIR }}/latest' "
-          rsync -avz TaskStorm.API/bin/Release/net10.0/ ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }}:${{ secrets.WORK_DIR }}/$VERSION/
+          mkdir -p ~/.ssh
+          chmod 700 ~/.ssh
+          echo "$SSH_KEY" > ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519
+          ssh-keyscan -p ${{ secrets.SSH_PORT }} -H "${{ secrets.SSH_HOST }}" >> ~/.ssh/known_hosts
 
-      - name: Restart app on server
+      - name: Create .env locally
+        env:
+          ENV_CONTENT: ${{ secrets.ENV_FILE }}
         run: |
-          ssh ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} \
-            "sudo systemctl restart taskstorm-api.service"
+          echo "$ENV_CONTENT" > .env
+
+      - name: Copy files to Beta Server
+        run: |
+          rsync -avz -e "ssh -p ${{ secrets.SSH_PORT }} -i ~/.ssh/id_ed25519" \
+          --exclude='.git' --exclude='**/bin' --exclude='**/obj' \
+          ./ ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }}:${{ secrets.WORK_DIR }}/TaskStorm
+
+      - name: Deploy via Docker Compose (Near Zero-Downtime)
+        run: |
+          ssh -p ${{ secrets.SSH_PORT }} -i ~/.ssh/id_ed25519 ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} "
+            cd ${{ secrets.WORK_DIR }}/TaskStorm && \
+            docker-compose up -d --build --remove-orphans
+          "
+
+      - name: Show containers status
+        run: |
+          ssh -p ${{ secrets.SSH_PORT }} -i ~/.ssh/id_ed25519 ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} "cd ${{ secrets.WORK_DIR }}/TaskStorm && docker-compose ps"
 
       - name: Cleanup
         run: rm -rf ~/.ssh
