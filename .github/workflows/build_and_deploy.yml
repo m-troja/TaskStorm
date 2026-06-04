@@ -27,7 +27,7 @@ jobs:
         run: |
           echo "$ENV_CONTENT" > .env
 
-      - name: Copy files to Beta Server
+      - name: Copy files to Prod Server
         run: |
           rsync -avz -e "ssh -p ${{ secrets.SSH_PORT }} -i ~/.ssh/id_ed25519" \
           --exclude='.git' --exclude='**/bin' --exclude='**/obj' \
