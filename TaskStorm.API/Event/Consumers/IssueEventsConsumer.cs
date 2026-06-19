@@ -75,9 +75,10 @@ public class IssueEventsConsumer :
             };
 
             _db.Notifications.Add(notification);
+            await _db.SaveChangesAsync();
+
             await _hubContext.Clients.All.SendAsync("ReceiveNotification", notification);
         }
 
-        await _db.SaveChangesAsync();
     }
 }
